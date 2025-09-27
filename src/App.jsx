@@ -1,86 +1,156 @@
-import React, { useState } from 'react';
-import {
-  User,
-  Building2,
-  Home as HomeIcon,
-  Users,
-  DollarSign,
-  Calendar,
-  FileText,
-  CreditCard,
-  BarChart3,
-  Settings as SettingsIcon,
-  Menu,
-} from 'lucide-react';
+import React from 'react';
+import { Routes, Route, Navigate, useLocation } from 'react-router-dom';
 
-import Login from './pages/Login';
-import HomePage from './pages/Home';
-import Companies from './pages/Companies';
-import Employees from './pages/Employees';
-import PayRuns from './pages/PayRuns';
-import Payslips from './pages/Payslips';
-import Payments from './pages/Payments';
-import Reports from './pages/Reports';
-import SettingsPage from './pages/Settings';
+import Login from './pages/Login/Login';
+import HomePage from './pages/Home/Home';
+import Companies from './pages/Companies/Companies';
+import Employees from './pages/Employees/Employees';
+import PayRuns from './pages/PayRuns/PayRuns';
+import Payslips from './pages/Payslips/Payslips';
+import Payments from './pages/Payments/Payments';
+import Reports from './pages/Reports/Reports';
+import SettingsPage from './pages/Settings/Settings';
 import Layout from './components/layout/Layout';
 import RoleSwitcher from './components/ui/RoleSwitcher';
+import { useAuth } from './context/AuthContext';
 
-const App = () => {
-  const [currentUser, setCurrentUser] = useState({
-    role: 'SUPER_ADMIN', // SUPER_ADMIN, ADMIN, CASHIER
-    name: 'John Doe',
-    company: 'Acme Corp'
-  });
-  const [activeView, setActiveView] = useState('login');
+const ProtectedRoute = ({ children, requiredRole }) => {
+  const location = useLocation();
+  const { currentUser, loading, isAuthenticated } = useAuth();
 
-  const handleLogin = () => {
-    setActiveView('dashboard');
-  };
-
-  const renderPage = () => {
-    switch(activeView) {
-      case 'login':
-        return <Login onLogin={handleLogin} />;
-      case 'dashboard':
-        return <HomePage currentUser={currentUser} />;
-      case 'companies':
-        return currentUser.role === 'SUPER_ADMIN' ? <Companies /> : <HomePage currentUser={currentUser} />;
-      case 'employees':
-        return <Employees currentUser={currentUser} />;
-      case 'payruns':
-        return <PayRuns currentUser={currentUser} />;
-      case 'payslips':
-        return <Payslips currentUser={currentUser} />;
-      case 'payments':
-        return <Payments currentUser={currentUser} />;
-      case 'reports':
-        return <Reports />;
-      case 'settings':
-        return <SettingsPage currentUser={currentUser} />;
-      default:
-        return <HomePage currentUser={currentUser} />;
-    }
-  };
-
-  if (activeView === 'login') {
+  if (loading) {
     return (
-      <>
-        {renderPage()}
-        <RoleSwitcher currentUser={currentUser} setCurrentUser={setCurrentUser} />
-      </>
+      <div className="flex items-center justify-center min-h-screen bg-gray-50">
+        <div className="text-lg text-gray-600">Loading...</div>
+      </div>
     );
   }
 
+  if (!isAuthenticated()) {
+    return <Navigate to="/login" state={{ from: location }} replace />;
+  }
+
+  if (requiredRole && currentUser?.role !== requiredRole) {
+    return <Navigate to="/dashboard" replace />;
+  }
+
+  return children;
+};
+
+const App = () => {
+  const { isAuthenticated } = useAuth();
+
   return (
     <>
-      <Layout
-        currentUser={currentUser}
-        activeView={activeView}
-        setActiveView={setActiveView}
-      >
-        {renderPage()}
-      </Layout>
-      <RoleSwitcher currentUser={currentUser} setCurrentUser={setCurrentUser} />
+      <Routes>
+        <Route
+          path="/login"
+          element={
+            isAuthenticated() ? (
+              <Navigate to="/dashboard" replace />
+            ) : (
+              <Login />
+            )
+          }
+        />
+        <Route
+          path="/"
+          element={
+            <ProtectedRoute>
+              <Navigate to="/dashboard" replace />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/dashboard"
+          element={
+            <ProtectedRoute>
+              <Layout>
+                <HomePage />
+              </Layout>
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/companies"
+          element={
+            <ProtectedRoute requiredRole="SUPER_ADMIN">
+              <Layout>
+                <Companies />
+              </Layout>
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/employees"
+          element={
+            <ProtectedRoute>
+              <Layout>
+                <Employees />
+              </Layout>
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/payruns"
+          element={
+            <ProtectedRoute>
+              <Layout>
+                <PayRuns />
+              </Layout>
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/payslips"
+          element={
+            <ProtectedRoute>
+              <Layout>
+                <Payslips />
+              </Layout>
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/payments"
+          element={
+            <ProtectedRoute>
+              <Layout>
+                <Payments />
+              </Layout>
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/reports"
+          element={
+            <ProtectedRoute>
+              <Layout>
+                <Reports />
+              </Layout>
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/settings"
+          element={
+            <ProtectedRoute>
+              <Layout>
+                <SettingsPage />
+              </Layout>
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="*"
+          element={
+            <ProtectedRoute>
+              <Navigate to="/dashboard" replace />
+            </ProtectedRoute>
+          }
+        />
+      </Routes>
+      {isAuthenticated() && <RoleSwitcher />}
     </>
   );
 };

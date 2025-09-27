@@ -1,4 +1,5 @@
 import React from 'react';
+import { useNavigate, useLocation } from 'react-router-dom';
 import {
   User,
   Building2,
@@ -11,47 +12,60 @@ import {
   BarChart3,
   Settings,
   Menu,
+  LogOut,
 } from 'lucide-react';
+import { useAuth } from '../../context/AuthContext';
 
-const Layout = ({ children, currentUser, activeView, setActiveView }) => {
+const Layout = ({ children }) => {
+  const navigate = useNavigate();
+  const location = useLocation();
+  const { currentUser, logout } = useAuth();
+
+  if (!currentUser) {
+    return (
+      <div className="flex items-center justify-center min-h-screen bg-gray-50">
+        <div className="text-lg text-gray-600">Loading...</div>
+      </div>
+    );
+  }
+
   const getMenuItems = () => {
     const commonItems = [
-      { id: 'dashboard', icon: Home, label: 'Dashboard' },
+      { path: '/dashboard', icon: Home, label: 'Dashboard' },
     ];
 
     if (currentUser.role === 'SUPER_ADMIN') {
       return [
         ...commonItems,
-        { id: 'companies', icon: Building2, label: 'Companies' },
-        { id: 'users', icon: Users, label: 'Users' },
-        { id: 'employees', icon: User, label: 'Employees' },
-        { id: 'payruns', icon: Calendar, label: 'Pay Runs' },
-        { id: 'payslips', icon: FileText, label: 'Payslips' },
-        { id: 'payments', icon: CreditCard, label: 'Payments' },
-        { id: 'reports', icon: BarChart3, label: 'Reports' },
-        { id: 'settings', icon: Settings, label: 'Settings' },
+        { path: '/companies', icon: Building2, label: 'Companies' },
+        { path: '/employees', icon: Users, label: 'Employees' },
+        { path: '/payruns', icon: Calendar, label: 'Pay Runs' },
+        { path: '/payslips', icon: FileText, label: 'Payslips' },
+        { path: '/payments', icon: CreditCard, label: 'Payments' },
+        { path: '/reports', icon: BarChart3, label: 'Reports' },
+        { path: '/settings', icon: Settings, label: 'Settings' },
       ];
     }
 
     if (currentUser.role === 'ADMIN') {
       return [
         ...commonItems,
-        { id: 'employees', icon: User, label: 'Employees' },
-        { id: 'payruns', icon: Calendar, label: 'Pay Runs' },
-        { id: 'payslips', icon: FileText, label: 'Payslips' },
-        { id: 'payments', icon: CreditCard, label: 'Payments' },
-        { id: 'reports', icon: BarChart3, label: 'Reports' },
-        { id: 'settings', icon: Settings, label: 'Settings' },
+        { path: '/employees', icon: User, label: 'Employees' },
+        { path: '/payruns', icon: Calendar, label: 'Pay Runs' },
+        { path: '/payslips', icon: FileText, label: 'Payslips' },
+        { path: '/payments', icon: CreditCard, label: 'Payments' },
+        { path: '/reports', icon: BarChart3, label: 'Reports' },
+        { path: '/settings', icon: Settings, label: 'Settings' },
       ];
     }
 
     // CASHIER
     return [
       ...commonItems,
-      { id: 'employees', icon: User, label: 'Employees', readonly: true },
-      { id: 'payslips', icon: FileText, label: 'Payslips', readonly: true },
-      { id: 'payments', icon: CreditCard, label: 'Payments' },
-      { id: 'reports', icon: BarChart3, label: 'Reports' },
+      { path: '/employees', icon: User, label: 'Employees', readonly: true },
+      { path: '/payslips', icon: FileText, label: 'Payslips', readonly: true },
+      { path: '/payments', icon: CreditCard, label: 'Payments' },
+      { path: '/reports', icon: BarChart3, label: 'Reports' },
     ];
   };
 
@@ -69,16 +83,17 @@ const Layout = ({ children, currentUser, activeView, setActiveView }) => {
               <nav className="mt-8 flex-1 px-2 space-y-1">
                 {getMenuItems().map((item) => {
                   const Icon = item.icon;
+                  const isActive = location.pathname === item.path;
                   return (
                     <button
-                      key={item.id}
-                      onClick={() => !item.readonly && setActiveView(item.id)}
+                      key={item.path}
+                      onClick={() => !item.readonly && navigate(item.path)}
                       className={`${
-                        activeView === item.id
+                        isActive
                           ? 'bg-gray-800 text-white'
                           : 'text-gray-300 hover:bg-gray-700 hover:text-white'
                       } group flex items-center px-2 py-2 text-sm font-medium rounded-md w-full ${
-                        item.readonly ? 'opacity-60' : ''
+                        item.readonly ? 'opacity-60 cursor-not-allowed' : ''
                       }`}
                     >
                       <Icon className="mr-3 h-6 w-6" />
@@ -89,8 +104,8 @@ const Layout = ({ children, currentUser, activeView, setActiveView }) => {
                 })}
               </nav>
             </div>
-            <div className="flex-shrink-0 flex bg-gray-800 p-4">
-              <div className="flex-shrink-0 group block">
+            <div className="flex-shrink-0 flex flex-col bg-gray-800 p-4">
+              <div className="flex-shrink-0 group block mb-4">
                 <div className="flex items-center">
                   <div className="inline-block h-9 w-9 rounded-full bg-gray-600 flex items-center justify-center">
                     <User className="h-5 w-5 text-white" />
@@ -101,6 +116,13 @@ const Layout = ({ children, currentUser, activeView, setActiveView }) => {
                   </div>
                 </div>
               </div>
+              <button
+                onClick={logout}
+                className="flex items-center w-full px-3 py-2 text-sm text-gray-300 hover:text-white hover:bg-gray-700 rounded-md transition-colors"
+              >
+                <LogOut className="h-4 w-4 mr-2" />
+                Logout
+              </button>
             </div>
           </div>
         </div>
@@ -114,7 +136,7 @@ const Layout = ({ children, currentUser, activeView, setActiveView }) => {
             <button className="p-2">
               <Menu className="h-6 w-6" />
             </button>
-            <h1 className="font-semibold">{getViewTitle(activeView)}</h1>
+            <h1 className="font-semibold">{getViewTitle(location.pathname)}</h1>
             <div className="w-8" />
           </div>
         </div>
@@ -127,18 +149,18 @@ const Layout = ({ children, currentUser, activeView, setActiveView }) => {
   );
 };
 
-const getViewTitle = (activeView) => {
-  const titles = {
-    dashboard: 'Dashboard',
-    companies: 'Companies',
-    employees: 'Employees',
-    payruns: 'Pay Runs',
-    payslips: 'Payslips',
-    payments: 'Payments',
-    reports: 'Reports',
-    settings: 'Settings'
+const getViewTitle = (pathname) => {
+  const pathToTitle = {
+    '/dashboard': 'Dashboard',
+    '/companies': 'Companies',
+    '/employees': 'Employees',
+    '/payruns': 'Pay Runs',
+    '/payslips': 'Payslips',
+    '/payments': 'Payments',
+    '/reports': 'Reports',
+    '/settings': 'Settings'
   };
-  return titles[activeView] || 'Dashboard';
+  return pathToTitle[pathname] || 'Dashboard';
 };
 
 export default Layout;
