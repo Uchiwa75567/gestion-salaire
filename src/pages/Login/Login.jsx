@@ -55,7 +55,7 @@ const Login = () => {
       if (result.success) {
         navigate('/dashboard');
       } else {
-        setErrors({ general: result.error || 'Login failed. Please check your credentials.' });
+        setErrors({ general: 'Email or password incorrect' });
       }
     } catch (err) {
       setErrors({ general: 'An error occurred during login. Please try again.' });
