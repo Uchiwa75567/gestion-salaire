@@ -244,7 +244,7 @@ Ce projet est sous licence MIT - voir le fichier [LICENSE](LICENSE) pour plus de
 
 ## 📞 Support
 
-Pour le support, envoyez un email à support@payrollpro.com ou créez une issue dans le dépôt.
+Pour le support, envoyez un email à pabassdiame76@gmail.com ou créez une issue dans le dépôt.
 
 ## 🔄 Améliorations Futures
 
