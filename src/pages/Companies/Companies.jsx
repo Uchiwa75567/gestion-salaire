@@ -1,7 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import {
   Plus,
-  Eye,
   Edit,
   Trash2,
   X,
@@ -367,9 +366,6 @@ const Companies = () => {
                     <span className="px-2 py-1 rounded-full text-xs bg-green-100 text-green-800">
                       Active
                     </span>
-                    <button className="p-2 text-gray-600 hover:bg-gray-100 rounded">
-                      <Eye className="h-4 w-4" />
-                    </button>
                     <button
                       onClick={() => handleEditCompany(company)}
                       className="p-2 text-gray-600 hover:bg-gray-100 rounded"
@@ -419,9 +415,6 @@ const Companies = () => {
                     <span className="px-2 py-1 rounded-full text-xs bg-green-100 text-green-800">
                       Active
                     </span>
-                    <button className="p-2 text-gray-600 hover:bg-gray-100 rounded">
-                      <Eye className="h-4 w-4" />
-                    </button>
                     <button
                       onClick={() => handleEditCompany(company)}
                       className="p-2 text-gray-600 hover:bg-gray-100 rounded"

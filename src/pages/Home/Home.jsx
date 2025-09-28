@@ -210,7 +210,7 @@ const Home = () => {
           </div>
 
           {/* Key Metrics for Super Admin */}
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
             <div className="bg-gradient-to-r from-indigo-500 to-indigo-600 p-6 rounded-2xl shadow-xl text-white">
               <div className="flex items-center justify-between">
                 <div>
@@ -236,20 +236,6 @@ const Home = () => {
               <div className="mt-4 flex items-center text-sm">
                 <Activity className="h-4 w-4 mr-1" />
                 <span>{((companies.filter(c => c.status !== 'deleted').length / companies.length) * 100).toFixed(1)}% active rate</span>
-              </div>
-            </div>
-
-            <div className="bg-gradient-to-r from-cyan-500 to-cyan-600 p-6 rounded-2xl shadow-xl text-white">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-cyan-100 text-sm font-medium">Total Revenue</p>
-                  <p className="text-3xl font-bold">$2.4M</p>
-                </div>
-                <DollarSign className="h-8 w-8 text-cyan-200" />
-              </div>
-              <div className="mt-4 flex items-center text-sm">
-                <TrendingUp className="h-4 w-4 mr-1" />
-                <span>+22% from last month</span>
               </div>
             </div>
 
