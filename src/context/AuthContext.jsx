@@ -17,6 +17,7 @@ export const AuthProvider = ({ children }) => {
 
   useEffect(() => {
     const user = getCurrentUser();
+    console.log('Loaded user from localStorage:', user);
     setCurrentUser(user);
     setLoading(false);
   }, []);
@@ -49,6 +50,8 @@ export const AuthProvider = ({ children }) => {
       }
 
       const data = await response.json();
+      console.log('Login response user:', data.user);
+
       const { token, user } = data;
 
       localStorage.setItem('token', token);
@@ -56,7 +59,7 @@ export const AuthProvider = ({ children }) => {
 
       setCurrentUser(user);
 
-      return { success: true };
+      return { success: true, user };
     } catch (error) {
       return { success: false, error: error.message };
     }

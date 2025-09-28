@@ -4,6 +4,7 @@ import { Routes, Route, Navigate, useLocation } from 'react-router-dom';
 import Login from './pages/Login/Login';
 import HomePage from './pages/Home/Home';
 import Companies from './pages/Companies/Companies';
+import Admins from './pages/Admins';
 import Employees from './pages/Employees/Employees';
 import PayRuns from './pages/PayRuns/PayRuns';
 import Payslips from './pages/Payslips/Payslips';
@@ -74,9 +75,19 @@ const App = () => {
         <Route
           path="/companies"
           element={
-            <ProtectedRoute requiredRole="SUPER_ADMIN">
+            <ProtectedRoute requiredRole="SUPERADMIN">
               <Layout>
                 <Companies />
+              </Layout>
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/admins"
+          element={
+            <ProtectedRoute requiredRole="SUPERADMIN">
+              <Layout>
+                <Admins />
               </Layout>
             </ProtectedRoute>
           }

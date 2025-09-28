@@ -34,16 +34,11 @@ const Layout = ({ children }) => {
       { path: '/dashboard', icon: Home, label: 'Dashboard' },
     ];
 
-    if (currentUser.role === 'SUPER_ADMIN') {
+    if (currentUser.role === 'SUPERADMIN') {
       return [
         ...commonItems,
         { path: '/companies', icon: Building2, label: 'Companies' },
-        { path: '/employees', icon: Users, label: 'Employees' },
-        { path: '/payruns', icon: Calendar, label: 'Pay Runs' },
-        { path: '/payslips', icon: FileText, label: 'Payslips' },
-        { path: '/payments', icon: CreditCard, label: 'Payments' },
-        { path: '/reports', icon: BarChart3, label: 'Reports' },
-        { path: '/settings', icon: Settings, label: 'Settings' },
+        { path: '/admins', icon: Users, label: 'Admins' },
       ];
     }
 
@@ -68,6 +63,8 @@ const Layout = ({ children }) => {
       { path: '/reports', icon: BarChart3, label: 'Reports' },
     ];
   };
+
+  console.log('Layout render, role:', currentUser?.role, 'menu:', getMenuItems());
 
   return (
     <div className="flex h-screen bg-gray-50">
