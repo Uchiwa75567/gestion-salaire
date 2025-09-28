@@ -33,6 +33,19 @@ const Companies = () => {
   const [previewUrl, setPreviewUrl] = useState('');
   const [fieldErrors, setFieldErrors] = useState({});
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [isDeleting, setIsDeleting] = useState(false);
+  const [showEditModal, setShowEditModal] = useState(false);
+  const [editingCompany, setEditingCompany] = useState(null);
+  const [editFormData, setEditFormData] = useState({
+    name: '',
+    address: '',
+    currency: 'USD',
+    periodType: 'MONTHLY',
+    logo: null,
+  });
+  const [editPreviewUrl, setEditPreviewUrl] = useState('');
+  const [editFieldErrors, setEditFieldErrors] = useState({});
+  const [isUpdating, setIsUpdating] = useState(false);
 
   useEffect(() => {
     fetchCompanies();
@@ -137,6 +150,20 @@ const Companies = () => {
     }
   };
 
+  const handleEditCompany = (company) => {
+    setEditingCompany(company);
+    setEditFormData({
+      name: company.name || '',
+      address: company.address || '',
+      currency: company.currency || 'USD',
+      periodType: company.periodType || 'MONTHLY',
+      logo: null,
+    });
+    setEditPreviewUrl(company.logo || '');
+    setEditFieldErrors({});
+    setShowEditModal(true);
+  };
+
   const handleDeleteCompany = async (id) => {
     setSelectedCompanyId(id);
     setShowDeleteModal(true);
@@ -144,6 +171,7 @@ const Companies = () => {
 
   const confirmDelete = async () => {
     if (selectedCompanyId) {
+      setIsDeleting(true);
       try {
         await api.delete(`/company/${selectedCompanyId}`);
         setShowDeleteModal(false);
@@ -153,7 +181,95 @@ const Companies = () => {
       } catch (err) {
         console.error('Failed to delete company:', err);
         setError('Failed to delete company');
+      } finally {
+        setIsDeleting(false);
       }
+    }
+  };
+
+  const handleUpdateCompany = async (e) => {
+    e.preventDefault();
+
+    // Validation
+    const errors = {};
+    if (!editFormData.name.trim()) {
+      errors.name = 'Company name is required';
+    }
+    if (!editFormData.address.trim()) {
+      errors.address = 'Address is required';
+    }
+    if (!editFormData.currency) {
+      errors.currency = 'Currency is required';
+    }
+    if (!editFormData.periodType) {
+      errors.periodType = 'Period type is required';
+    }
+
+    if (Object.keys(errors).length > 0) {
+      setEditFieldErrors(errors);
+      return;
+    }
+
+    setEditFieldErrors({});
+    setIsUpdating(true);
+
+    const data = new FormData();
+    data.append('name', editFormData.name);
+    data.append('address', editFormData.address);
+    data.append('currency', editFormData.currency);
+    data.append('periodType', editFormData.periodType);
+    if (editFormData.logo) {
+      if (editFormData.logo.size > 5 * 1024 * 1024) { // 5MB limit
+        setError('Please select a valid image file (max 5MB)');
+        return;
+      }
+      data.append('logo', editFormData.logo);
+    }
+
+    try {
+      await api.put(`/company/${editingCompany.id}`, data, {
+        headers: {
+          'Content-Type': 'multipart/form-data',
+        },
+      });
+      setShowEditModal(false);
+      setEditingCompany(null);
+      setEditFormData({
+        name: '',
+        address: '',
+        currency: 'USD',
+        periodType: 'MONTHLY',
+        logo: null,
+      });
+      if (editPreviewUrl && editPreviewUrl !== editingCompany.logo) {
+        URL.revokeObjectURL(editPreviewUrl);
+      }
+      setEditPreviewUrl('');
+      setError('');
+      setEditFieldErrors({});
+      fetchCompanies();
+    } catch (err) {
+      console.error('Failed to update company:', err);
+      setError('Failed to update company');
+    } finally {
+      setIsUpdating(false);
+    }
+  };
+
+  const handleEditInputChange = (e) => {
+    const { name, value } = e.target;
+    setEditFormData(prev => ({ ...prev, [name]: value }));
+    setEditFieldErrors(prev => ({ ...prev, [name]: '' }));
+  };
+
+  const handleEditFileChange = (e) => {
+    const file = e.target.files[0];
+    setEditFormData(prev => ({ ...prev, logo: file }));
+    if (file) {
+      const url = URL.createObjectURL(file);
+      setEditPreviewUrl(url);
+    } else {
+      setEditPreviewUrl(editingCompany?.logo || '');
     }
   };
 
@@ -163,6 +279,7 @@ const Companies = () => {
   };
 
   const filteredCompanies = companies.filter(company =>
+    (company.name && company.name.toLowerCase().includes(searchTerm.toLowerCase())) ||
     company.address.toLowerCase().includes(searchTerm.toLowerCase()) ||
     company.currency.toLowerCase().includes(searchTerm.toLowerCase()) ||
     company.periodType.toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -202,7 +319,7 @@ const Companies = () => {
           <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-4 w-4" />
           <input
             type="text"
-            placeholder="Search companies by address, currency, period type, or ID..."
+            placeholder="Search companies by name, address, currency, period type, or ID..."
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
             className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
@@ -241,6 +358,7 @@ const Companies = () => {
                   </div>
                   <h3 className="font-semibold text-gray-900 mb-2">{company.name || company.address}</h3>
                   <p className="text-sm text-gray-600 mb-1"><span className="font-medium">ID:</span> {company.id}</p>
+                  {company.name && <p className="text-sm text-gray-600 mb-1"><span className="font-medium">Name:</span> {company.name}</p>}
                   <p className="text-sm text-gray-600 mb-1"><span className="font-medium">Address:</span> {company.address}</p>
                   <p className="text-sm text-gray-600 mb-1"><span className="font-medium">Currency:</span> {company.currency}</p>
                   <p className="text-sm text-gray-600 mb-1"><span className="font-medium">Period Type:</span> {company.periodType}</p>
@@ -252,12 +370,20 @@ const Companies = () => {
                     <button className="p-2 text-gray-600 hover:bg-gray-100 rounded">
                       <Eye className="h-4 w-4" />
                     </button>
-                    <button className="p-2 text-gray-600 hover:bg-gray-100 rounded">
+                    <button
+                      onClick={() => handleEditCompany(company)}
+                      className="p-2 text-gray-600 hover:bg-gray-100 rounded"
+                    >
                       <Edit className="h-4 w-4" />
                     </button>
                     <button
                       onClick={() => handleDeleteCompany(company.id)}
-                      className="p-2 text-red-600 hover:bg-red-100 rounded"
+                      disabled={isDeleting}
+                      className={`p-2 rounded ${
+                        isDeleting
+                          ? 'text-gray-400 cursor-not-allowed'
+                          : 'text-red-600 hover:bg-red-100'
+                      }`}
                     >
                       <Trash2 className="h-4 w-4" />
                     </button>
@@ -270,18 +396,19 @@ const Companies = () => {
                       {company.logo ? (
                         <img
                           src={company.logo}
-                          alt={company.address || 'Company'}
+                          alt={company.name || company.address || 'Company'}
                           className="w-full h-full object-cover"
                         />
                       ) : (
                         <div className="w-full h-full bg-green-500 flex items-center justify-center text-white font-bold">
-                          {company.address.charAt(0)}
+                          {(company.name || company.address || 'C').charAt(0)}
                         </div>
                       )}
                     </div>
                     <div className="space-y-1">
-                      <h3 className="font-semibold text-gray-900">{company.address}</h3>
+                      <h3 className="font-semibold text-gray-900">{company.name || company.address}</h3>
                       <p className="text-sm text-gray-600">ID: {company.id}</p>
+                      {company.name && <p className="text-sm text-gray-600">Name: {company.name}</p>}
                       <p className="text-sm text-gray-600">Address: {company.address}</p>
                       <p className="text-sm text-gray-600">Currency: {company.currency}</p>
                       <p className="text-sm text-gray-600">Period Type: {company.periodType}</p>
@@ -295,12 +422,20 @@ const Companies = () => {
                     <button className="p-2 text-gray-600 hover:bg-gray-100 rounded">
                       <Eye className="h-4 w-4" />
                     </button>
-                    <button className="p-2 text-gray-600 hover:bg-gray-100 rounded">
+                    <button
+                      onClick={() => handleEditCompany(company)}
+                      className="p-2 text-gray-600 hover:bg-gray-100 rounded"
+                    >
                       <Edit className="h-4 w-4" />
                     </button>
                     <button
                       onClick={() => handleDeleteCompany(company.id)}
-                      className="p-2 text-red-600 hover:bg-red-100 rounded"
+                      disabled={isDeleting}
+                      className={`p-2 rounded ${
+                        isDeleting
+                          ? 'text-gray-400 cursor-not-allowed'
+                          : 'text-red-600 hover:bg-red-100'
+                      }`}
                     >
                       <Trash2 className="h-4 w-4" />
                     </button>
@@ -432,6 +567,126 @@ const Companies = () => {
         </div>
       )}
 
+      {/* Edit Company Modal */}
+      {showEditModal && (
+        <div className="fixed inset-0 backdrop-blur-xl bg-black/20 flex items-center justify-center p-4 z-50">
+          <div className="bg-white rounded-lg p-6 w-full max-w-md">
+            <div className="flex justify-between items-center mb-4">
+              <h3 className="text-lg font-semibold">Edit Company</h3>
+              <button
+                onClick={() => setShowEditModal(false)}
+                className="p-1 text-gray-400 hover:text-gray-600"
+              >
+                <X className="h-5 w-5" />
+              </button>
+            </div>
+            <form onSubmit={handleUpdateCompany} className="space-y-4">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Company Name</label>
+                <input
+                  type="text"
+                  name="name"
+                  value={editFormData.name}
+                  onChange={handleEditInputChange}
+                  className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 ${editFieldErrors.name ? 'border-red-500' : 'border-gray-300'}`}
+                  placeholder="Enter company name"
+                />
+                {editFieldErrors.name && <p className="text-red-500 text-sm mt-1">{editFieldErrors.name}</p>}
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Address</label>
+                <input
+                  type="text"
+                  name="address"
+                  value={editFormData.address}
+                  onChange={handleEditInputChange}
+                  className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 ${editFieldErrors.address ? 'border-red-500' : 'border-gray-300'}`}
+                  placeholder="Enter company address"
+                />
+                {editFieldErrors.address && <p className="text-red-500 text-sm mt-1">{editFieldErrors.address}</p>}
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Currency</label>
+                <select
+                  name="currency"
+                  value={editFormData.currency}
+                  onChange={handleEditInputChange}
+                  className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 ${editFieldErrors.currency ? 'border-red-500' : 'border-gray-300'}`}
+                >
+                  <option value="USD">USD</option>
+                  <option value="EUR">EUR</option>
+                  <option value="GBP">GBP</option>
+                  <option value="CAD">CAD</option>
+                  <option value="AUD">AUD</option>
+                  <option value="CFA">CFA</option>
+                </select>
+                {editFieldErrors.currency && <p className="text-red-500 text-sm mt-1">{editFieldErrors.currency}</p>}
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Period Type</label>
+                <select
+                  name="periodType"
+                  value={editFormData.periodType}
+                  onChange={handleEditInputChange}
+                  className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 ${editFieldErrors.periodType ? 'border-red-500' : 'border-gray-300'}`}
+                >
+                  <option value="MONTHLY">Monthly</option>
+                  <option value="WEEKLY">Weekly</option>
+                  <option value="BI-WEEKLY">Bi-weekly</option>
+                  <option value="DAILY">Daily</option>
+                </select>
+                {editFieldErrors.periodType && <p className="text-red-500 text-sm mt-1">{editFieldErrors.periodType}</p>}
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Logo (Image file, optional)</label>
+                <input
+                  type="file"
+                  name="logo"
+                  accept="image/*"
+                  onChange={handleEditFileChange}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+                />
+                <p className="text-xs text-gray-500 mt-1">Upload company logo (max 5MB, images only)</p>
+                {editPreviewUrl && (
+                  <div className="mt-2">
+                    <img
+                      src={editPreviewUrl}
+                      alt="Logo preview"
+                      className="w-20 h-20 object-cover rounded border"
+                    />
+                  </div>
+                )}
+              </div>
+              <div className="flex justify-end space-x-2">
+                <button
+                  type="button"
+                  onClick={() => setShowEditModal(false)}
+                  className="px-4 py-2 text-gray-600 border border-gray-300 rounded-lg hover:bg-gray-50"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  disabled={isUpdating}
+                  className={`px-4 py-2 rounded-lg font-medium flex items-center justify-center ${
+                    isUpdating ? 'bg-gray-400 cursor-not-allowed' : 'bg-blue-600 hover:bg-blue-700 text-white'
+                  }`}
+                >
+                  {isUpdating ? (
+                    <>
+                      <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                      Updating...
+                    </>
+                  ) : (
+                    'Update Company'
+                  )}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
       {/* Delete Confirmation Modal */}
       {showDeleteModal && (
         <div className="fixed inset-0 backdrop-blur-xl bg-black/20 flex items-center justify-center p-4 z-50">
@@ -452,10 +707,19 @@ const Companies = () => {
               <button
                 type="button"
                 onClick={confirmDelete}
-                className="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 flex items-center"
+                disabled={isDeleting}
+                className={`px-4 py-2 rounded-lg flex items-center ${
+                  isDeleting
+                    ? 'bg-gray-400 cursor-not-allowed'
+                    : 'bg-red-600 hover:bg-red-700 text-white'
+                }`}
               >
-                <Trash2 className="h-4 w-4 mr-2" />
-                Delete
+                {isDeleting ? (
+                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                ) : (
+                  <Trash2 className="h-4 w-4 mr-2" />
+                )}
+                {isDeleting ? 'Deleting...' : 'Delete'}
               </button>
             </div>
           </div>
