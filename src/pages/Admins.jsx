@@ -21,10 +21,11 @@ const Admins = () => {
   const [showEditModal, setShowEditModal] = useState(false);
   const [selectedAdmin, setSelectedAdmin] = useState(null);
   const [formData, setFormData] = useState({
-    firstName: '',
-    lastName: '',
+    name: '',
+    prenom: '',
     email: '',
-    companyId: '',
+    role: 'ADMIN',
+    companyId: null,
   });
   const { currentUser } = useAuth();
 
@@ -36,9 +37,11 @@ const Admins = () => {
   const fetchAdmins = async () => {
     try {
       setLoading(true);
-      const response = await api.get('/admin');
-      console.log('Fetched admins:', response.data);
-      setAdmins(response.data || []);
+      const response = await api.get('/auth/users');
+      console.log('Fetched users:', response.data);
+      // Filter for admins only
+      const adminUsers = response.data.filter(user => user.role === 'ADMIN') || [];
+      setAdmins(adminUsers);
     } catch (err) {
       console.error('Failed to fetch admins:', err);
       setError('Failed to load admins');
@@ -59,13 +62,23 @@ const Admins = () => {
 
   const handleCreateAdmin = async (e) => {
     e.preventDefault();
+    if (!formData.companyId || formData.companyId === null || formData.companyId === undefined) {
+      setError('Company is required');
+      return;
+    }
+    console.log('Sending create admin data:', JSON.stringify(formData, null, 2));
     try {
-      await api.post('/admin', formData);
+      const response = await api.post('/auth/create-user', formData);
+      console.log('Create admin success:', response.data);
       setShowCreateModal(false);
-      setFormData({ firstName: '', lastName: '', email: '', companyId: '' });
+      setFormData({ name: '', prenom: '', email: '', role: 'ADMIN', companyId: null });
       fetchAdmins();
+      alert('Admin created successfully! A temporary password has been sent to their email.');
     } catch (err) {
-      setError('Failed to create admin');
+      console.error('Create admin error:', err);
+      console.error('Error response data:', err.response?.data);
+      console.error('Error response status:', err.response?.status);
+      setError(err.response?.data?.message || err.response?.data?.error || 'Failed to create admin');
     }
   };
 
@@ -127,11 +140,11 @@ const Admins = () => {
               <div key={admin.id} className="px-6 py-4 flex items-center justify-between hover:bg-gray-50">
                 <div className="flex items-center">
                   <div className="w-10 h-10 bg-blue-600 rounded-full flex items-center justify-center text-white font-medium mr-4">
-                    {admin.firstName.charAt(0)}{admin.lastName.charAt(0)}
+                    {admin.prenom?.charAt(0) || ''}{admin.name?.charAt(0) || ''}
                   </div>
                   <div>
                     <p className="font-medium text-gray-900">
-                      {admin.firstName} {admin.lastName}
+                      {admin.prenom} {admin.name}
                     </p>
                     <p className="text-sm text-gray-600">Email: {admin.email}</p>
                     <p className="text-sm text-gray-600">
@@ -144,9 +157,10 @@ const Admins = () => {
                     onClick={() => {
                       setSelectedAdmin(admin);
                       setFormData({
-                        firstName: admin.firstName,
-                        lastName: admin.lastName,
+                        name: admin.name,
+                        prenom: admin.prenom,
                         email: admin.email,
+                        role: 'ADMIN',
                         companyId: admin.companyId,
                       });
                       setShowEditModal(true);
@@ -175,21 +189,21 @@ const Admins = () => {
             <h3 className="text-lg font-semibold mb-4">Create New Admin</h3>
             <form onSubmit={handleCreateAdmin} className="space-y-4">
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">First Name</label>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Prénom</label>
                 <input
                   type="text"
-                  value={formData.firstName}
-                  onChange={(e) => setFormData({ ...formData, firstName: e.target.value })}
+                  value={formData.prenom}
+                  onChange={(e) => setFormData({ ...formData, prenom: e.target.value })}
                   required
                   className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
                 />
               </div>
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Last Name</label>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Nom</label>
                 <input
                   type="text"
-                  value={formData.lastName}
-                  onChange={(e) => setFormData({ ...formData, lastName: e.target.value })}
+                  value={formData.name}
+                  onChange={(e) => setFormData({ ...formData, name: e.target.value })}
                   required
                   className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
                 />
@@ -207,8 +221,8 @@ const Admins = () => {
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">Company</label>
                 <select
-                  value={formData.companyId}
-                  onChange={(e) => setFormData({ ...formData, companyId: e.target.value })}
+                  value={formData.companyId || ''}
+                  onChange={(e) => setFormData({ ...formData, companyId: e.target.value ? parseInt(e.target.value) : null })}
                   required
                   className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
                 >
@@ -247,21 +261,21 @@ const Admins = () => {
             <h3 className="text-lg font-semibold mb-4">Edit Admin</h3>
             <form onSubmit={handleEditAdmin} className="space-y-4">
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">First Name</label>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Prénom</label>
                 <input
                   type="text"
-                  value={formData.firstName}
-                  onChange={(e) => setFormData({ ...formData, firstName: e.target.value })}
+                  value={formData.prenom}
+                  onChange={(e) => setFormData({ ...formData, prenom: e.target.value })}
                   required
                   className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
                 />
               </div>
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Last Name</label>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Nom</label>
                 <input
                   type="text"
-                  value={formData.lastName}
-                  onChange={(e) => setFormData({ ...formData, lastName: e.target.value })}
+                  value={formData.name}
+                  onChange={(e) => setFormData({ ...formData, name: e.target.value })}
                   required
                   className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
                 />
@@ -279,8 +293,8 @@ const Admins = () => {
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">Company</label>
                 <select
-                  value={formData.companyId}
-                  onChange={(e) => setFormData({ ...formData, companyId: e.target.value })}
+                  value={formData.companyId || ''}
+                  onChange={(e) => setFormData({ ...formData, companyId: e.target.value ? parseInt(e.target.value) : null })}
                   required
                   className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
                 >

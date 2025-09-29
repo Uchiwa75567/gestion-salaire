@@ -150,6 +150,7 @@ const getViewTitle = (pathname) => {
   const pathToTitle = {
     '/dashboard': 'Dashboard',
     '/companies': 'Companies',
+    '/admins': 'Admins',
     '/employees': 'Employees',
     '/payruns': 'Pay Runs',
     '/payslips': 'Payslips',

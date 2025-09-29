@@ -48,10 +48,10 @@ export const createCompany = (data) => api.post('/company', data, {
     'Content-Type': 'multipart/form-data',
   },
 });
+ 
+export const getUsers = () => api.get('/auth/users');
 
-export const getAdmins = () => api.get('/admin');
-
-export const createAdmin = (data) => api.post('/admin', data);
+export const createAdmin = (data) => api.post('/auth/create-user', data);
 
 export const getAdminById = (id) => api.get(`/admin/${id}`);
 
