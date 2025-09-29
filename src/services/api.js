@@ -59,4 +59,12 @@ export const updateAdmin = (id, data) => api.put(`/admin/${id}`, data);
 
 export const deleteAdmin = (id) => api.delete(`/admin/${id}`);
 
+export const getEmployees = () => api.get('/employees');
+
+export const createEmployee = (data) => api.post('/employees', data);
+
+export const updateEmployee = (id, data) => api.put(`/employees/${id}`, data);
+
+export const deleteEmployee = (id) => api.delete(`/employees/${id}`);
+
 export default api;
