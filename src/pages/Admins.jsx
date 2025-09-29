@@ -25,6 +25,8 @@ const Admins = () => {
   const [adminToDelete, setAdminToDelete] = useState(null);
   const [successMessage, setSuccessMessage] = useState('');
   const [isCreatingAdmin, setIsCreatingAdmin] = useState(false);
+  const [isDeletingAdmin, setIsDeletingAdmin] = useState(false);
+  const [fieldErrors, setFieldErrors] = useState({});
   const [formData, setFormData] = useState({
     name: '',
     prenom: '',
@@ -67,10 +69,28 @@ const Admins = () => {
 
   const handleCreateAdmin = async (e) => {
     e.preventDefault();
+
+    // Validation
+    const errors = {};
+    if (!formData.prenom.trim()) {
+      errors.prenom = 'Le prénom est requis';
+    }
+    if (!formData.name.trim()) {
+      errors.name = 'Le nom est requis';
+    }
+    if (!formData.email.trim()) {
+      errors.email = 'L\'email est requis';
+    }
     if (!formData.companyId || formData.companyId === null || formData.companyId === undefined) {
-      setError('Company is required');
+      errors.companyId = 'La société est requise';
+    }
+
+    if (Object.keys(errors).length > 0) {
+      setFieldErrors(errors);
       return;
     }
+
+    setFieldErrors({});
     console.log('Sending create admin data:', JSON.stringify(formData, null, 2));
     setIsCreatingAdmin(true);
     try {
@@ -116,6 +136,7 @@ const Admins = () => {
   const confirmDeleteAdmin = async () => {
     if (!adminToDelete) return;
 
+    setIsDeletingAdmin(true);
     try {
       await api.delete(`/auth/users/${adminToDelete.id}`);
       setShowDeleteModal(false);
@@ -129,6 +150,8 @@ const Admins = () => {
       setError(err.response?.data?.message || 'Failed to delete admin');
       setShowDeleteModal(false);
       setAdminToDelete(null);
+    } finally {
+      setIsDeletingAdmin(false);
     }
   };
 
@@ -232,9 +255,11 @@ const Admins = () => {
                   type="text"
                   value={formData.prenom}
                   onChange={(e) => setFormData({ ...formData, prenom: e.target.value })}
-                  required
                   className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
                 />
+                {fieldErrors.prenom && (
+                  <p className="mt-1 text-sm text-red-600">{fieldErrors.prenom}</p>
+                )}
               </div>
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">Nom</label>
@@ -242,26 +267,29 @@ const Admins = () => {
                   type="text"
                   value={formData.name}
                   onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-                  required
                   className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
                 />
+                {fieldErrors.name && (
+                  <p className="mt-1 text-sm text-red-600">{fieldErrors.name}</p>
+                )}
               </div>
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">Email</label>
                 <input
-                  type="email"
+                  type="text"
                   value={formData.email}
                   onChange={(e) => setFormData({ ...formData, email: e.target.value })}
-                  required
                   className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
                 />
+                {fieldErrors.email && (
+                  <p className="mt-1 text-sm text-red-600">{fieldErrors.email}</p>
+                )}
               </div>
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">Company</label>
                 <select
                   value={formData.companyId || ''}
                   onChange={(e) => setFormData({ ...formData, companyId: e.target.value ? parseInt(e.target.value) : null })}
-                  required
                   className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
                 >
                   <option value="">Select Company</option>
@@ -271,6 +299,9 @@ const Admins = () => {
                     </option>
                   ))}
                 </select>
+                {fieldErrors.companyId && (
+                  <p className="mt-1 text-sm text-red-600">{fieldErrors.companyId}</p>
+                )}
               </div>
               <div className="flex justify-end space-x-2">
                 <button
@@ -400,10 +431,22 @@ const Admins = () => {
               <button
                 type="button"
                 onClick={confirmDeleteAdmin}
-                className="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 flex items-center"
+                disabled={isDeletingAdmin}
+                className={`px-4 py-2 rounded-lg font-medium flex items-center justify-center ${
+                  isDeletingAdmin ? 'bg-gray-400 cursor-not-allowed' : 'bg-red-600 hover:bg-red-700 text-white'
+                }`}
               >
-                <Trash2 className="h-4 w-4 mr-2" />
-                Delete Admin
+                {isDeletingAdmin ? (
+                  <>
+                    <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                    Deleting...
+                  </>
+                ) : (
+                  <>
+                    <Trash2 className="h-4 w-4 mr-2" />
+                    Delete Admin
+                  </>
+                )}
               </button>
             </div>
           </div>
