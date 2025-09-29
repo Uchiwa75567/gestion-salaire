@@ -8,6 +8,7 @@ import {
   Building2,
   Mail,
   UserPlus,
+  Loader2,
 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import api from '../services/api';
@@ -19,7 +20,11 @@ const Admins = () => {
   const [error, setError] = useState('');
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [showEditModal, setShowEditModal] = useState(false);
+  const [showDeleteModal, setShowDeleteModal] = useState(false);
   const [selectedAdmin, setSelectedAdmin] = useState(null);
+  const [adminToDelete, setAdminToDelete] = useState(null);
+  const [successMessage, setSuccessMessage] = useState('');
+  const [isCreatingAdmin, setIsCreatingAdmin] = useState(false);
   const [formData, setFormData] = useState({
     name: '',
     prenom: '',
@@ -67,18 +72,24 @@ const Admins = () => {
       return;
     }
     console.log('Sending create admin data:', JSON.stringify(formData, null, 2));
+    setIsCreatingAdmin(true);
     try {
       const response = await api.post('/auth/create-user', formData);
       console.log('Create admin success:', response.data);
       setShowCreateModal(false);
       setFormData({ name: '', prenom: '', email: '', role: 'ADMIN', companyId: null });
       fetchAdmins();
-      alert('Admin created successfully! A temporary password has been sent to their email.');
+      setSuccessMessage('Admin created successfully! A temporary password has been sent to their email.');
+      setError(''); // Clear any previous errors
+      // Auto-hide success message after 5 seconds
+      setTimeout(() => setSuccessMessage(''), 5000);
     } catch (err) {
       console.error('Create admin error:', err);
       console.error('Error response data:', err.response?.data);
       console.error('Error response status:', err.response?.status);
       setError(err.response?.data?.message || err.response?.data?.error || 'Failed to create admin');
+    } finally {
+      setIsCreatingAdmin(false);
     }
   };
 
@@ -89,20 +100,41 @@ const Admins = () => {
       setShowEditModal(false);
       setSelectedAdmin(null);
       fetchAdmins();
+      setSuccessMessage('Admin updated successfully!');
+      setError(''); // Clear any previous errors
+      setTimeout(() => setSuccessMessage(''), 5000);
     } catch (err) {
       setError('Failed to update admin');
     }
   };
 
-  const handleDeleteAdmin = async (id) => {
-    if (window.confirm('Are you sure you want to delete this admin?')) {
-      try {
-        await api.delete(`/admin/${id}`);
-        fetchAdmins();
-      } catch (err) {
-        setError('Failed to delete admin');
-      }
+  const handleDeleteAdmin = (admin) => {
+    setAdminToDelete(admin);
+    setShowDeleteModal(true);
+  };
+
+  const confirmDeleteAdmin = async () => {
+    if (!adminToDelete) return;
+
+    try {
+      await api.delete(`/auth/users/${adminToDelete.id}`);
+      setShowDeleteModal(false);
+      setAdminToDelete(null);
+      fetchAdmins();
+      setSuccessMessage('Admin deleted successfully!');
+      setError(''); // Clear any previous errors
+      setTimeout(() => setSuccessMessage(''), 5000);
+    } catch (err) {
+      console.error('Delete admin error:', err);
+      setError(err.response?.data?.message || 'Failed to delete admin');
+      setShowDeleteModal(false);
+      setAdminToDelete(null);
     }
+  };
+
+  const cancelDeleteAdmin = () => {
+    setShowDeleteModal(false);
+    setAdminToDelete(null);
   };
 
   if (loading) {
@@ -125,6 +157,12 @@ const Admins = () => {
       {error && (
         <div className="mb-4 p-3 bg-red-100 border border-red-400 text-red-700 rounded">
           {error}
+        </div>
+      )}
+
+      {successMessage && (
+        <div className="mb-4 p-3 bg-green-100 border border-green-400 text-green-700 rounded">
+          {successMessage}
         </div>
       )}
 
@@ -170,7 +208,7 @@ const Admins = () => {
                     <Edit className="h-4 w-4" />
                   </button>
                   <button
-                    onClick={() => handleDeleteAdmin(admin.id)}
+                    onClick={() => handleDeleteAdmin(admin)}
                     className="p-2 text-red-600 hover:bg-red-100 rounded"
                   >
                     <Trash2 className="h-4 w-4" />
@@ -244,9 +282,19 @@ const Admins = () => {
                 </button>
                 <button
                   type="submit"
-                  className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700"
+                  disabled={isCreatingAdmin}
+                  className={`px-4 py-2 rounded-lg font-medium flex items-center justify-center ${
+                    isCreatingAdmin ? 'bg-gray-400 cursor-not-allowed' : 'bg-blue-600 hover:bg-blue-700 text-white'
+                  }`}
                 >
-                  Create Admin
+                  {isCreatingAdmin ? (
+                    <>
+                      <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                      Creating...
+                    </>
+                  ) : (
+                    'Create Admin'
+                  )}
                 </button>
               </div>
             </form>
@@ -325,6 +373,39 @@ const Admins = () => {
                 </button>
               </div>
             </form>
+          </div>
+        </div>
+      )}
+
+      {/* Delete Confirmation Modal */}
+      {showDeleteModal && adminToDelete && (
+        <div className="fixed inset-0 backdrop-blur-xl bg-black/20 flex items-center justify-center p-4 z-50">
+          <div className="bg-white rounded-lg p-6 w-full max-w-md">
+            <div className="flex items-center space-x-3 mb-4">
+              <Trash2 className="h-5 w-5 text-red-500" />
+              <h3 className="text-lg font-semibold text-gray-900">Confirm Delete</h3>
+            </div>
+            <p className="text-gray-600 mb-6">
+              Are you sure you want to delete the admin <strong>{adminToDelete.name} {adminToDelete.prenom}</strong>?
+              This action cannot be undone.
+            </p>
+            <div className="flex justify-end space-x-2">
+              <button
+                type="button"
+                onClick={cancelDeleteAdmin}
+                className="px-4 py-2 text-gray-600 border border-gray-300 rounded-lg hover:bg-gray-50"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={confirmDeleteAdmin}
+                className="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 flex items-center"
+              >
+                <Trash2 className="h-4 w-4 mr-2" />
+                Delete Admin
+              </button>
+            </div>
           </div>
         </div>
       )}
