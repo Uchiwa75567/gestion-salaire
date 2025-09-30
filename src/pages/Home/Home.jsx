@@ -28,7 +28,7 @@ import { useAuth } from '../../context/AuthContext';
 import api from '../../services/api';
 
 const Home = () => {
-  const { currentUser } = useAuth();
+  const { currentUser, impersonateCompanyId } = useAuth();
   const [companies, setCompanies] = useState([]);
   const [employees, setEmployees] = useState([]);
   const [payruns, setPayruns] = useState([]);
@@ -40,15 +40,26 @@ const Home = () => {
 
   useEffect(() => {
     fetchData();
-  }, [currentUser?.role]);
+  }, [currentUser?.role, impersonateCompanyId]);
 
   const fetchData = async () => {
     try {
       setLoading(true);
 
-      // Fetch companies (always available)
-      const companiesRes = await api.get('/company');
-      setCompanies(companiesRes.data || []);
+      // Fetch companies only for Super Admin without impersonation
+      if (currentUser.role === 'SUPERADMIN' && !impersonateCompanyId) {
+        try {
+          const companiesRes = await api.get('/company');
+          setCompanies(companiesRes.data || []);
+        } catch (compErr) {
+          if (compErr.response?.status !== 404) {
+            console.error('Failed to fetch companies:', compErr);
+          }
+          setCompanies([]);
+        }
+      } else {
+        setCompanies([]);
+      }
 
       // Try to fetch employees (may not exist yet)
       try {
@@ -135,14 +146,9 @@ const Home = () => {
   // Dynamic metrics
   const metrics = React.useMemo(() => {
     const totalEmployees = employees.length;
-    const activeEmployees = employees.filter(emp => emp.status === 'Active').length;
+    const activeEmployees = employees.filter(emp => emp.isActive).length;
     const totalPayruns = payruns.length;
-    const totalAmount = payruns.reduce((sum, payrun) => {
-      const amount = typeof payrun.amount === 'string'
-        ? parseFloat(payrun.amount.replace(/[$,]/g, ''))
-        : payrun.amount || 0;
-      return sum + amount;
-    }, 0);
+    const totalAmount = payruns.reduce((sum, pr) => sum + (pr.totalNet ?? pr.totalGross ?? 0), 0);
     const upcomingPayments = employees.slice(0, 4); // Mock upcoming payments
 
     return {
@@ -167,7 +173,7 @@ const Home = () => {
     ];
   }, []);
 
-  if (currentUser.role === 'SUPERADMIN') {
+  if (currentUser.role === 'SUPERADMIN' && !impersonateCompanyId) {
     if (loading) {
       return (
         <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 p-6">
