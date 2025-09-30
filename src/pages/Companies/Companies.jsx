@@ -70,7 +70,19 @@ const Companies = () => {
     e.preventDefault();
 
     // Validation
-    m
+    const errors = {};
+    if (!formData.name.trim()) {
+      errors.name = 'Company name is required';
+    }
+    if (!formData.address.trim()) {
+      errors.address = 'Address is required';
+    }
+    if (!formData.currency) {
+      errors.currency = 'Currency is required';
+    }
+    if (!formData.periodType) {
+      errors.periodType = 'Period type is required';
+    }
 
     if (Object.keys(errors).length > 0) {
       setFieldErrors(errors);
