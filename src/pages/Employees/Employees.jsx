@@ -553,7 +553,7 @@ const Employees = () => {
             <div className="text-center py-8 text-gray-500">No employees found</div>
           ) : (
             filteredEmployees.map((employee) => (
-              <div key={employee.id} className="bg-white p-6 rounded-lg shadow">
+              <div key={employee.id} className="bg-white p-6 rounded-lg shadow cursor-pointer" onClick={() => window.location.href = `/employees/${employee.id}`}>
                 <div className="flex items-center justify-between">
                   <div className="flex items-center">
                     <div className="w-10 h-10 bg-blue-600 rounded-full flex items-center justify-center text-white font-medium mr-4">

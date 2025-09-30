@@ -6,9 +6,11 @@ import HomePage from './pages/Home/Home';
 import Companies from './pages/Companies/Companies';
 import Admins from './pages/Admins';
 import Employees from './pages/Employees/Employees';
+import EmployeeDetails from './pages/Employees/EmployeeDetails';
 import PayRuns from './pages/PayRuns/PayRuns';
 import Payslips from './pages/Payslips/Payslips';
 import Payments from './pages/Payments/Payments';
+import Cashiers from './pages/Cashiers/Cashiers';
 import Reports from './pages/Reports/Reports';
 import SettingsPage from './pages/Settings/Settings';
 import CompanyDetails from './pages/CompanyDetails/CompanyDetails';
@@ -125,6 +127,16 @@ const App = () => {
           }
         />
         <Route
+          path="/employees/:id"
+          element={
+            <ProtectedRoute>
+              <Layout>
+                <EmployeeDetails />
+              </Layout>
+            </ProtectedRoute>
+          }
+        />
+        <Route
           path="/payruns"
           element={
             <ProtectedRoute>
@@ -160,6 +172,16 @@ const App = () => {
             <ProtectedRoute>
               <Layout>
                 <Reports />
+              </Layout>
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/cashiers"
+          element={
+            <ProtectedRoute>
+              <Layout>
+                <Cashiers />
               </Layout>
             </ProtectedRoute>
           }

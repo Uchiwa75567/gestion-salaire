@@ -85,6 +85,7 @@ export const updateAdmin = (id, data) => api.put(`/admin/${id}`, data);
 export const deleteAdmin = (id) => api.delete(`/admin/${id}`);
 
 export const getEmployees = (params = {}) => api.get('/employees', { params });
+export const getEmployeeById = (id) => api.get(`/employees/${id}`);
 
 export const createEmployee = (data) => api.post('/employees', data);
 

@@ -14,6 +14,7 @@ import {
   Menu,
   LogOut,
 } from 'lucide-react';
+import { UserPlus } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
 import api from '../../services/api';
 
@@ -87,6 +88,7 @@ const Layout = ({ children }) => {
         { path: '/payslips', icon: FileText, label: 'Payslips' },
         { path: '/payments', icon: CreditCard, label: 'Payments' },
         { path: '/reports', icon: BarChart3, label: 'Reports' },
+        { path: '/cashiers', icon: UserPlus, label: 'Cashiers' },
         { path: '/settings', icon: Settings, label: 'Settings' },
       ];
     }
