@@ -65,6 +65,10 @@ export const createEmployee = (data) => api.post('/employees', data);
 
 export const updateEmployee = (id, data) => api.put(`/employees/${id}`, data);
 
+export const activateEmployee = (id) => api.patch(`/employees/${id}/activate`);
+
+export const deactivateEmployee = (id) => api.patch(`/employees/${id}/deactivate`);
+
 export const deleteEmployee = (id) => api.delete(`/employees/${id}`);
 
 export default api;
