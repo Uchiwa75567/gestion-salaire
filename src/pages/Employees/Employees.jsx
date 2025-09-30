@@ -30,6 +30,7 @@ const Employees = () => {
   const [submitting, setSubmitting] = useState(false);
   const [fieldErrors, setFieldErrors] = useState({});
   const [error, setError] = useState('');
+  const [loadingEmployeeId, setLoadingEmployeeId] = useState(null);
 
   useEffect(() => {
     fetchEmployees();
@@ -115,6 +116,7 @@ const Employees = () => {
   const confirmDeleteEmployee = (employee) => {
     setEmployeeToDelete(employee);
     setShowDeleteModal(true);
+    setLoadingEmployeeId(null); // Reset loading state when modal opens
   };
 
   const handleEditEmployee = (employee) => {
@@ -128,6 +130,7 @@ const Employees = () => {
     });
     setFieldErrors({});
     setShowEditModal(true);
+    setLoadingEmployeeId(null); // Reset loading state when modal opens
   };
 
   const handleUpdateEmployee = async (e) => {
@@ -321,7 +324,10 @@ const Employees = () => {
       <div className="bg-white rounded-lg p-6 w-full max-w-md">
         <div className="flex justify-between items-center mb-4">
           <h2 className="text-xl font-semibold">Edit Employee</h2>
-          <button onClick={() => setShowEditModal(false)} className="text-gray-600 hover:text-gray-900">
+          <button onClick={() => {
+            setShowEditModal(false);
+            setLoadingEmployeeId(null);
+          }} className="text-gray-600 hover:text-gray-900">
             <X className="h-5 w-5" />
           </button>
         </div>
@@ -411,7 +417,10 @@ const Employees = () => {
           <div className="flex justify-end space-x-2">
             <button
               type="button"
-              onClick={() => setShowEditModal(false)}
+              onClick={() => {
+                setShowEditModal(false);
+                setLoadingEmployeeId(null);
+              }}
               className="px-4 py-2 rounded bg-gray-300 hover:bg-gray-400"
               disabled={submitting}
             >
@@ -436,7 +445,10 @@ const Employees = () => {
       <div className="bg-white rounded-lg p-6 w-full max-w-md">
         <div className="flex justify-between items-center mb-4">
           <h2 className="text-xl font-semibold text-red-600">Delete Employee</h2>
-          <button onClick={() => setShowDeleteModal(false)} className="text-gray-600 hover:text-gray-900">
+          <button onClick={() => {
+            setShowDeleteModal(false);
+            setLoadingEmployeeId(null);
+          }} className="text-gray-600 hover:text-gray-900">
             <X className="h-5 w-5" />
           </button>
         </div>
@@ -451,7 +463,10 @@ const Employees = () => {
         <div className="flex justify-end space-x-2">
           <button
             type="button"
-            onClick={() => setShowDeleteModal(false)}
+            onClick={() => {
+              setShowDeleteModal(false);
+              setLoadingEmployeeId(null);
+            }}
             className="px-4 py-2 rounded bg-gray-300 hover:bg-gray-400"
           >
             Cancel
@@ -565,29 +580,50 @@ const Employees = () => {
                     {(currentUser.role === 'ADMIN' || currentUser.role === 'SUPERADMIN') && (
                       <div className="flex space-x-2">
                         <button
-                          onClick={() => handleEditEmployee(employee)}
-                          className="p-2 text-gray-600 hover:bg-gray-100 rounded"
+                          onClick={() => {
+                            setLoadingEmployeeId(employee.id);
+                            handleEditEmployee(employee);
+                          }}
+                          className={`p-2 rounded ${
+                            loadingEmployeeId === employee.id ? 'text-gray-400 bg-gray-100 cursor-not-allowed' : 'text-gray-600 hover:bg-gray-100'
+                          }`}
+                          disabled={loadingEmployeeId === employee.id}
                         >
                           <Edit className="h-4 w-4" />
                         </button>
                         <button
-                          onClick={() => confirmDeleteEmployee(employee)}
-                          className="p-2 text-red-600 hover:bg-red-100 rounded"
+                          onClick={() => {
+                            setLoadingEmployeeId(employee.id);
+                            confirmDeleteEmployee(employee);
+                          }}
+                          className={`p-2 rounded ${
+                            loadingEmployeeId === employee.id ? 'text-red-400 bg-red-100 cursor-not-allowed' : 'text-red-600 hover:bg-red-100'
+                          }`}
+                          disabled={loadingEmployeeId === employee.id}
                         >
                           <Trash2 className="h-4 w-4" />
                         </button>
                         <button
                           onClick={() => {
+                            setLoadingEmployeeId(employee.id);
                             if (employee.isActive) {
-                              deactivateEmployee(employee.id).then(fetchEmployees);
+                              deactivateEmployee(employee.id).then(() => {
+                                fetchEmployees();
+                                setLoadingEmployeeId(null);
+                              });
                             } else {
-                              activateEmployee(employee.id).then(fetchEmployees);
+                              activateEmployee(employee.id).then(() => {
+                                fetchEmployees();
+                                setLoadingEmployeeId(null);
+                              });
                             }
                           }}
                           className={`p-2 rounded ${
+                            loadingEmployeeId === employee.id ? 'cursor-not-allowed opacity-50' :
                             employee.isActive ? 'text-yellow-600 hover:bg-yellow-100' : 'text-green-600 hover:bg-green-100'
                           }`}
                           title={employee.isActive ? 'Deactivate Employee' : 'Activate Employee'}
+                          disabled={loadingEmployeeId === employee.id}
                         >
                           {employee.isActive ? (
                             <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
