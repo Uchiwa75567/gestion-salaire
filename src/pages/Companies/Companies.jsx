@@ -12,8 +12,10 @@ import {
   Loader2,
 } from 'lucide-react';
 import api from '../../services/api';
+import { useNavigate } from 'react-router-dom';
 
 const Companies = () => {
+  const navigate = useNavigate();
   const [companies, setCompanies] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
@@ -375,7 +377,10 @@ const Companies = () => {
                 </div>
               ) : (
                 <>
-                  <div className="flex items-start space-x-4 flex-1">
+                  <div
+                    className="flex items-start space-x-4 flex-1 cursor-pointer"
+                    onClick={() => navigate(`/companies/${company.id}`)}
+                  >
                     <div className="relative w-12 h-12 rounded-lg overflow-hidden flex-shrink-0">
                       {company.logo ? (
                         <img

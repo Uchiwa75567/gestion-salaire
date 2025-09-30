@@ -19,7 +19,7 @@ import { useAuth } from '../../context/AuthContext';
 const Layout = ({ children }) => {
   const navigate = useNavigate();
   const location = useLocation();
-  const { currentUser, logout } = useAuth();
+  const { currentUser, logout, impersonateCompanyId, stopImpersonation } = useAuth();
 
   if (!currentUser) {
     return (
@@ -34,7 +34,7 @@ const Layout = ({ children }) => {
       { path: '/dashboard', icon: Home, label: 'Dashboard' },
     ];
 
-    if (currentUser.role === 'SUPERADMIN') {
+    if (currentUser.role === 'SUPERADMIN' && !impersonateCompanyId) {
       return [
         ...commonItems,
         { path: '/companies', icon: Building2, label: 'Companies' },
@@ -42,7 +42,7 @@ const Layout = ({ children }) => {
       ];
     }
 
-    if (currentUser.role === 'ADMIN') {
+    if (currentUser.role === 'ADMIN' || (currentUser.role === 'SUPERADMIN' && impersonateCompanyId)) {
       return [
         ...commonItems,
         { path: '/employees', icon: User, label: 'Employees' },
@@ -127,6 +127,17 @@ const Layout = ({ children }) => {
 
       {/* Main content */}
       <div className="flex-1 flex flex-col overflow-hidden">
+        {impersonateCompanyId && (
+          <div className="bg-yellow-100 text-yellow-800 px-4 py-2 text-sm flex items-center justify-between">
+            <span>Impersonation admin actif pour l'entreprise #{impersonateCompanyId}</span>
+            <button
+              onClick={stopImpersonation}
+              className="px-3 py-1 rounded bg-yellow-200 hover:bg-yellow-300 text-yellow-900"
+            >
+              Quitter l'interface admin
+            </button>
+          </div>
+        )}
         {/* Mobile Header */}
         <div className="md:hidden">
           <div className="flex items-center justify-between p-4 bg-white border-b">

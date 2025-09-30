@@ -11,6 +11,8 @@ import Payslips from './pages/Payslips/Payslips';
 import Payments from './pages/Payments/Payments';
 import Reports from './pages/Reports/Reports';
 import SettingsPage from './pages/Settings/Settings';
+import CompanyDetails from './pages/CompanyDetails/CompanyDetails';
+import AdminDashboardByCompany from './pages/AdminDashboardByCompany/AdminDashboardByCompany';
 import Layout from './components/layout/Layout';
 import RoleSwitcher from './components/ui/RoleSwitcher';
 import { useAuth } from './context/AuthContext';
@@ -83,11 +85,31 @@ const App = () => {
           }
         />
         <Route
+          path="/companies/:id"
+          element={
+            <ProtectedRoute requiredRole="SUPERADMIN">
+              <Layout>
+                <CompanyDetails />
+              </Layout>
+            </ProtectedRoute>
+          }
+        />
+        <Route
           path="/admins"
           element={
             <ProtectedRoute requiredRole="SUPERADMIN">
               <Layout>
                 <Admins />
+              </Layout>
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/admin-view/company/:companyId"
+          element={
+            <ProtectedRoute requiredRole="SUPERADMIN">
+              <Layout>
+                <AdminDashboardByCompany />
               </Layout>
             </ProtectedRoute>
           }

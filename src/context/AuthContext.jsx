@@ -14,11 +14,14 @@ export const useAuth = () => {
 export const AuthProvider = ({ children }) => {
   const [currentUser, setCurrentUser] = useState(null);
   const [loading, setLoading] = useState(true);
+  const [impersonateCompanyId, setImpersonateCompanyId] = useState(null);
 
   useEffect(() => {
     const user = getCurrentUser();
     console.log('Loaded user from localStorage:', user);
     setCurrentUser(user);
+    const impId = localStorage.getItem('impersonateCompanyId');
+    setImpersonateCompanyId(impId ? Number(impId) : null);
     setLoading(false);
   }, []);
 
@@ -27,6 +30,10 @@ export const AuthProvider = ({ children }) => {
       if (e.key === 'user') {
         const user = getCurrentUser();
         setCurrentUser(user);
+      }
+      if (e.key === 'impersonateCompanyId') {
+        const impId = localStorage.getItem('impersonateCompanyId');
+        setImpersonateCompanyId(impId ? Number(impId) : null);
       }
     };
 
@@ -68,12 +75,24 @@ export const AuthProvider = ({ children }) => {
   const logout = () => {
     localStorage.removeItem('token');
     localStorage.removeItem('user');
+    localStorage.removeItem('impersonateCompanyId');
+    setImpersonateCompanyId(null);
     setCurrentUser(null);
   };
 
   const updateUser = (updatedUser) => {
     localStorage.setItem('user', JSON.stringify(updatedUser));
     setCurrentUser(updatedUser);
+  };
+
+  const startImpersonation = (companyId) => {
+    localStorage.setItem('impersonateCompanyId', String(companyId));
+    setImpersonateCompanyId(Number(companyId));
+  };
+
+  const stopImpersonation = () => {
+    localStorage.removeItem('impersonateCompanyId');
+    setImpersonateCompanyId(null);
   };
 
   const value = {
@@ -83,6 +102,9 @@ export const AuthProvider = ({ children }) => {
     logout,
     updateUser,
     isAuthenticated: () => isAuthenticated(),
+    impersonateCompanyId,
+    startImpersonation,
+    stopImpersonation,
   };
 
   return (
