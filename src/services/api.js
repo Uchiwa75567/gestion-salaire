@@ -96,4 +96,13 @@ export const deactivateEmployee = (id) => api.patch(`/employees/${id}/deactivate
 
 export const deleteEmployee = (id) => api.delete(`/employees/${id}`);
 
+// Pay Runs API
+export const getPayRuns = (params = {}) => api.get('/payruns', { params });
+export const getPayRunById = (id) => api.get(`/payruns/${id}`);
+export const createPayRun = (data) => api.post('/payruns', data);
+export const updatePayRun = (id, data) => api.put(`/payruns/${id}`, data);
+export const approvePayRun = (id) => api.patch(`/payruns/${id}/approve`);
+export const closePayRun = (id) => api.patch(`/payruns/${id}/close`);
+export const deletePayRun = (id) => api.delete(`/payruns/${id}`);
+
 export default api;
