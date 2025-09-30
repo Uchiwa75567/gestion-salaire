@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useEffect, useState } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import {
   User,
@@ -15,11 +15,48 @@ import {
   LogOut,
 } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
+import api from '../../services/api';
 
 const Layout = ({ children }) => {
   const navigate = useNavigate();
   const location = useLocation();
   const { currentUser, logout, impersonateCompanyId, stopImpersonation } = useAuth();
+  const [companyInfo, setCompanyInfo] = useState(null);
+
+  useEffect(() => {
+    let isMounted = true;
+    const fetchCompany = async () => {
+      try {
+        // If superadmin impersonates a company, we can call /company/:id
+        if (impersonateCompanyId) {
+          const res = await api.get(`/company/${impersonateCompanyId}`);
+          if (isMounted) setCompanyInfo(res.data);
+          return;
+        }
+        // If ADMIN/CAISSIER, they cannot access /company/:id (403). Use /employees to infer company.
+        if (currentUser.role === 'ADMIN' || currentUser.role === 'CAISSIER') {
+          try {
+            const empRes = await api.get('/employees');
+            const employees = empRes.data || [];
+            const comp = employees.find(e => e.company)?.company;
+            if (comp && isMounted) {
+              setCompanyInfo(comp);
+              return;
+            }
+          } catch (e) {
+            // ignore and fallback
+          }
+        }
+        // For Superadmin without impersonation, no company context
+        if (isMounted) setCompanyInfo(null);
+      } catch (e) {
+        if (isMounted) setCompanyInfo(null);
+        console.error('Failed to load company info for sidebar:', e);
+      }
+    };
+    fetchCompany();
+    return () => { isMounted = false; };
+  }, [impersonateCompanyId, currentUser?.companyId, currentUser?.role]);
 
   if (!currentUser) {
     return (
@@ -74,8 +111,29 @@ const Layout = ({ children }) => {
           <div className="flex flex-col h-0 flex-1 bg-gray-900">
             <div className="flex-1 flex flex-col pt-5 pb-4 overflow-y-auto">
               <div className="flex items-center flex-shrink-0 px-4">
-                <Building2 className="h-8 w-8 text-white" />
-                <span className="ml-2 text-white font-semibold">PayrollPro</span>
+                {companyInfo ? (
+                  <>
+                    {companyInfo.logo ? (
+                      <img
+                        src={companyInfo.logo}
+                        alt={companyInfo.name || 'Company'}
+                        className="h-8 w-8 rounded-lg object-cover"
+                      />
+                    ) : (
+                      <div className="h-8 w-8 rounded-lg bg-green-500 flex items-center justify-center text-white font-bold">
+                        {(companyInfo.name || companyInfo.address || 'C').charAt(0)}
+                      </div>
+                    )}
+                    <span className="ml-2 text-white font-semibold truncate max-w-[10rem]" title={companyInfo.name || companyInfo.address}>
+                      {companyInfo.name || companyInfo.address}
+                    </span>
+                  </>
+                ) : (
+                  <>
+                    <Building2 className="h-8 w-8 text-white" />
+                    <span className="ml-2 text-white font-semibold">PayrollPro</span>
+                  </>
+                )}
               </div>
               <nav className="mt-8 flex-1 px-2 space-y-1">
                 {getMenuItems().map((item) => {
