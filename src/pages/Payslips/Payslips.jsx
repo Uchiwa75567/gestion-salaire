@@ -215,11 +215,42 @@ const Payslips = () => {
       setError('Select a pay run');
       return;
     }
+
+    // Try official bulk endpoint first
     try {
       const res = await api.get(`/payslips/payrun/${selectedPayRunId}/pdf`, { responseType: 'blob' });
       saveBlob(new Blob([res.data], { type: 'application/pdf' }), `bulletins-paie-cycle-${selectedPayRunId}.pdf`);
+      return;
     } catch (err) {
-      setError(mapHttpError(err, 'Failed to download pay run payslips PDF'));
+      // Fallback: if backend route order causes 400/"ID invalide" or no payslips found, export individual PDFs
+      const status = err?.response?.status;
+      const apiMsg = err?.response?.data?.error || '';
+      const looksLikeRouteConflict = status === 400 && (apiMsg.toLowerCase().includes('id invalide') || apiMsg.toLowerCase().includes('aucun bulletin'));
+
+      if (!looksLikeRouteConflict) {
+        setError(mapHttpError(err, 'Failed to download pay run payslips PDF'));
+        return;
+      }
+
+      // Build list of payslips for the selected pay run
+      const listToExport = payslips.filter((p) => String(p.payRunId) === String(selectedPayRunId));
+      if (listToExport.length === 0) {
+        setError('No payslips found for this cycle');
+        return;
+      }
+
+      // Fallback: sequentially download each payslip PDF
+      try {
+        for (let i = 0; i < listToExport.length; i++) {
+          const p = listToExport[i];
+          // eslint-disable-next-line no-await-in-loop
+          const r = await api.get(`/payslips/${p.id}/pdf`, { responseType: 'blob' });
+          saveBlob(new Blob([r.data], { type: 'application/pdf' }), `bulletin-paie-${p.id}.pdf`);
+        }
+        setError('Bulk endpoint unavailable; exported individual PDFs instead.');
+      } catch (innerErr) {
+        setError(mapHttpError(innerErr, 'Failed to export individual PDFs'));
+      }
     }
   };
 
