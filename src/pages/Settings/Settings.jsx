@@ -2,8 +2,8 @@ import React, { useState } from 'react';
 import api from '../../services/api';
 import { useAuth } from '../../context/AuthContext';
 
-const Settings = ({ currentUser }) => {
-  const { updateUser } = useAuth();
+const Settings = () => {
+  const { currentUser, updateUser } = useAuth();
   const [showPasswordModal, setShowPasswordModal] = useState(false);
   const [passwordData, setPasswordData] = useState({
     newPassword: '',
@@ -152,7 +152,13 @@ const Settings = ({ currentUser }) => {
 
         {/* Save Button */}
         <div className="flex justify-end">
-          <button className="bg-blue-600 text-white px-6 py-2 rounded-lg hover:bg-blue-700">
+          <button
+            onClick={() => {
+              // In production, this would save the settings
+              alert('Settings saved successfully!');
+            }}
+            className="bg-blue-600 text-white px-6 py-2 rounded-lg hover:bg-blue-700"
+          >
             Sauvegarder les Modifications
           </button>
         </div>

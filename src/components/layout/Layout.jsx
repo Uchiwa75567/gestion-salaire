@@ -77,6 +77,7 @@ const Layout = ({ children }) => {
         ...commonItems,
         { path: '/companies', icon: Building2, label: 'Companies' },
         { path: '/admins', icon: Users, label: 'Admins' },
+        { path: '/cashiers', icon: UserPlus, label: 'Cashiers' },
       ];
     }
 
@@ -227,6 +228,7 @@ const getViewTitle = (pathname) => {
     '/payslips': 'Payslips',
     '/payments': 'Payments',
     '/reports': 'Reports',
+    '/cashiers': 'Cashiers',
     '/settings': 'Settings'
   };
   return pathToTitle[pathname] || 'Dashboard';

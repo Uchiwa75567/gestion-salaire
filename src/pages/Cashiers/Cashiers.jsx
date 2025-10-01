@@ -40,6 +40,28 @@ const Cashiers = () => {
         const filtered = all.filter(u => u.role === 'CAISSIER');
         // Si impersonation, on filtre par entreprise imitée
         const scoped = impersonateCompanyId ? filtered.filter(u => u.companyId === Number(impersonateCompanyId)) : filtered;
+
+        // Cache local par entreprise pour permettre l'affichage côté ADMIN sans endpoint dédié
+        try {
+          if (impersonateCompanyId) {
+            const key = `cashiers_company_${Number(impersonateCompanyId)}`;
+            localStorage.setItem(key, JSON.stringify(scoped));
+          } else {
+            const groups = filtered.reduce((acc, u) => {
+              const cid = Number(u.companyId || 0);
+              if (!cid) return acc;
+              if (!acc[cid]) acc[cid] = [];
+              acc[cid].push(u);
+              return acc;
+            }, {});
+            Object.entries(groups).forEach(([cid, list]) => {
+              localStorage.setItem(`cashiers_company_${cid}`, JSON.stringify(list));
+            });
+          }
+        } catch (_) {
+          // ignore cache errors
+        }
+
         setCashiers(scoped);
       } else {
         // ADMIN: pas d'endpoint de listing côté back; charger depuis localStorage pour persister dans la session
