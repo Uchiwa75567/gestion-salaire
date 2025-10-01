@@ -106,4 +106,21 @@ export const approvePayRun = (id) => api.patch(`/payruns/${id}/approve`);
 export const closePayRun = (id) => api.patch(`/payruns/${id}/close`);
 export const deletePayRun = (id) => api.delete(`/payruns/${id}`);
 
+export const getPayslipById = (id) => api.get(`/payslips/${id}`);
+
+// Payments API
+export const getPaymentsByPayslip = (payslipId) => api.get(`/payments/payslip/${payslipId}`);
+export const getPaymentsByCompany = (companyId, params = {}) => api.get(`/payments/company/${companyId}`, { params });
+export const getPaymentById = (id) => api.get(`/payments/${id}`);
+export const createPayment = (data) => api.post('/payments', data);
+export const updatePayment = (id, data) => api.put(`/payments/${id}`, data);
+export const deletePayment = (id) => api.delete(`/payments/${id}`);
+
+// Payments PDF exports
+export const downloadPaymentReceipt = (paymentId) => api.get(`/payments/${paymentId}/receipt`, { responseType: 'blob' });
+export const downloadCompanyPaymentsList = (companyId, params = {}) =>
+  api.get(`/payments/company/${companyId}/list`, { params, responseType: 'blob' });
+export const downloadPayrollRegister = (companyId, payRunId) =>
+  api.get(`/payments/company/${companyId}/payrun/${payRunId}/register`, { responseType: 'blob' });
+
 export default api;
