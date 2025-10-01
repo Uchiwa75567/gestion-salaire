@@ -139,7 +139,7 @@ const CompanyDetails = () => {
             Edit Company
           </button>
           <button
-            onClick={() => { startImpersonation(Number(id)); navigate('/employees'); }}
+            onClick={() => { startImpersonation(Number(id)); navigate('/dashboard'); }}
             className="bg-indigo-600 text-white px-4 py-2 rounded-lg hover:bg-indigo-700 flex items-center"
           >
             Voir l'interface de l'admin

@@ -1,6 +1,6 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { Mail, UserPlus, CheckCircle, XCircle, Info, Search, X } from 'lucide-react';
-import { createAdmin, getUsers } from '../../services/api';
+import api, { createAdmin, getUsers } from '../../services/api';
 import { useAuth } from '../../context/AuthContext';
 
 const Cashiers = () => {
@@ -33,19 +33,17 @@ const Cashiers = () => {
       setError('');
       setInfo('');
 
-      // Listing complet autorisé pour SUPERADMIN ou SUPERADMIN en impersonation
       if (currentUser.role === 'SUPERADMIN') {
+        // SUPERADMIN: liste complète depuis /auth/users
         const res = await getUsers();
         const all = Array.isArray(res.data) ? res.data : [];
         const filtered = all.filter(u => u.role === 'CAISSIER');
-        // Si impersonation, on filtre par entreprise imitée
         const scoped = impersonateCompanyId ? filtered.filter(u => u.companyId === Number(impersonateCompanyId)) : filtered;
 
-        // Cache local par entreprise pour permettre l'affichage côté ADMIN sans endpoint dédié
+        // Mise en cache par entreprise pour amélioration UX côté ADMIN
         try {
           if (impersonateCompanyId) {
-            const key = `cashiers_company_${Number(impersonateCompanyId)}`;
-            localStorage.setItem(key, JSON.stringify(scoped));
+            localStorage.setItem(`cashiers_company_${Number(impersonateCompanyId)}`, JSON.stringify(scoped));
           } else {
             const groups = filtered.reduce((acc, u) => {
               const cid = Number(u.companyId || 0);
@@ -58,28 +56,54 @@ const Cashiers = () => {
               localStorage.setItem(`cashiers_company_${cid}`, JSON.stringify(list));
             });
           }
-        } catch (_) {
-          // ignore cache errors
-        }
+        } catch (_) {}
 
         setCashiers(scoped);
-      } else {
-        // ADMIN: pas d'endpoint de listing côté back; charger depuis localStorage pour persister dans la session
-        if (storageKey) {
-          try {
-            const stored = JSON.parse(localStorage.getItem(storageKey) || '[]');
-            setCashiers(Array.isArray(stored) ? stored : []);
-          } catch (_) {
-            setCashiers([]);
+        return;
+      }
+
+      // ADMIN: Pas d'endpoint direct -> tenter plusieurs sources
+      let derived = [];
+
+      // 1) Cache local préparé par le SUPERADMIN en impersonation
+      if (storageKey) {
+        try {
+          const stored = JSON.parse(localStorage.getItem(storageKey) || '[]');
+          if (Array.isArray(stored) && stored.length) {
+            derived = stored;
           }
-        } else {
-          setCashiers([]);
+        } catch (_) {}
+      }
+
+      // 2) Heuristique: tenter d'inférer des caissiers via /payments/company/{companyId}
+      // Si des paiements existent, on peut remonter createdByUser comme indice de caissier
+      if (derived.length === 0 && companyScopeId) {
+        try {
+          const paymentsRes = await api.get(`/payments/company/${companyScopeId}`);
+          const payments = Array.isArray(paymentsRes.data) ? paymentsRes.data : [];
+          const caissiersMap = new Map();
+          payments.forEach(p => {
+            const u = p.createdByUser;
+            if (u && u.role === 'CAISSIER') {
+              caissiersMap.set(u.id, { id: u.id, name: u.name, email: u.email, role: 'CAISSIER', companyId: companyScopeId });
+            }
+          });
+          if (caissiersMap.size > 0) {
+            derived = Array.from(caissiersMap.values());
+            // persist minimal cache
+            if (storageKey) localStorage.setItem(storageKey, JSON.stringify(derived));
+          }
+        } catch (_) {
+          // ignore
         }
-        setInfo("Listing des caissiers limité à ceux créés par vous. Les comptes déjà existants ne sont pas listés par l'API pour ce rôle.");
+      }
+
+      setCashiers(derived);
+      if (derived.length === 0) {
+        setInfo("Aucun listing direct disponible pour votre rôle. Demandez à un SUPERADMIN d'ouvrir ce compte en mode impersonation pour initialiser l'affichage, ou enregistrez un paiement pour voir le caissier lié.");
       }
     } catch (err) {
       const msg = err?.response?.data?.error || err?.response?.data?.message || 'Failed to load cashiers';
-      // En cas de 403 pour ADMIN, info conviviale
       if (err?.response?.status === 403) {
         setInfo("Listing des utilisateurs non autorisé pour ce rôle. Vous pouvez toujours créer des caissiers.");
       } else {

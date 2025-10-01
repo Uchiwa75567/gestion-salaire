@@ -43,7 +43,7 @@ const ProtectedRoute = ({ children, requiredRole }) => {
 };
 
 const App = () => {
-  const { isAuthenticated } = useAuth();
+  const { isAuthenticated, currentUser, impersonateCompanyId } = useAuth();
 
   return (
     <>
