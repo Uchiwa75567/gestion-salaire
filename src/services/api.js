@@ -107,6 +107,7 @@ export const closePayRun = (id) => api.patch(`/payruns/${id}/close`);
 export const deletePayRun = (id) => api.delete(`/payruns/${id}`);
 
 export const getPayslipById = (id) => api.get(`/payslips/${id}`);
+export const getPayslipsByCompany = (companyId) => api.get(`/payslips/company/${companyId}`);
 
 // Payments API
 export const getPaymentsByPayslip = (payslipId) => api.get(`/payments/payslip/${payslipId}`);

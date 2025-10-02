@@ -25,6 +25,7 @@ import {
   downloadPaymentReceipt,
   downloadCompanyPaymentsList,
   downloadPayrollRegister,
+  getPayslipsByCompany,
 } from '../../services/api';
 
 const METHODS = ['CASH', 'BANK_TRANSFER', 'ORANGE_MONEY', 'WAVE', 'OTHER'];
@@ -38,6 +39,9 @@ const Payments = () => {
   const [startDate, setStartDate] = useState('');
   const [endDate, setEndDate] = useState('');
   const [search, setSearch] = useState('');
+
+  // Payslips for dropdown
+  const [payslips, setPayslips] = useState([]);
 
   // Data
   const [payments, setPayments] = useState([]);
@@ -84,6 +88,23 @@ const Payments = () => {
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [currentUser?.role]);
+
+  useEffect(() => {
+    if (!effectiveCompanyId) {
+      setPayslips([]);
+      return;
+    }
+    const loadPayslips = async () => {
+      try {
+        const res = await getPayslipsByCompany(effectiveCompanyId);
+        setPayslips(res.data || []);
+      } catch (err) {
+        console.error('Failed to load payslips', err);
+        setPayslips([]);
+      }
+    };
+    loadPayslips();
+  }, [effectiveCompanyId]);
 
   useEffect(() => {
     loadPayments();
