@@ -137,8 +137,7 @@ const Payments = () => {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [effectiveCompanyId, startDate, endDate]);
 
-  // Load unpaid payslips when employee is selected
-  // Removed because payment is now for all active employees of the company
+  // Load unpaid payslips grouped by payRun for payment recording
   useEffect(() => {
     if (!effectiveCompanyId) {
       setUnpaidPayslips([]);
@@ -148,22 +147,47 @@ const Payments = () => {
       try {
         const res = await getPayslipsByCompany(effectiveCompanyId);
         const allPayslips = res.data || [];
-        // Filter only unpaid or partial payslips (payRun level) for active employees
+
+        // Calculate remaining amounts for each payslip
+        const payslipsWithRemaining = await Promise.all(
+          allPayslips.map(async (payslip) => {
+            try {
+              const paymentsRes = await getPaymentsByPayslip(payslip.id);
+              const totalPaid = paymentsRes.data.reduce((sum, payment) => sum + Number(payment.amount || 0), 0);
+              const remainingAmount = payslip.netSalary - totalPaid;
+              return {
+                ...payslip,
+                remainingAmount: remainingAmount > 0 ? remainingAmount : 0
+              };
+            } catch (err) {
+              console.error(`Failed to calculate remaining for payslip ${payslip.id}`, err);
+              return {
+                ...payslip,
+                remainingAmount: payslip.netSalary // Assume no payments if error
+              };
+            }
+          })
+        );
+
+        // Filter only payslips with remaining amount and active employees
+        const unpaidPayslipsFiltered = payslipsWithRemaining.filter(p =>
+          p.remainingAmount > 0.01 && p.employee?.isActive
+        );
+
         // Group payslips by payRunId to get unique payRuns
         const payRunMap = new Map();
-        allPayslips.forEach(p => {
-          if (p.paymentStatus !== 'PAID' && p.employee?.isActive) {
-            if (!payRunMap.has(p.payRunId)) {
-              payRunMap.set(p.payRunId, {
-                payRunId: p.payRunId,
-                payRunName: p.payRun?.name || `Cycle ${p.payRunId}`,
-                period: p.payRun?.period || '',
-                payslips: []
-              });
-            }
-            payRunMap.get(p.payRunId).payslips.push(p);
+        unpaidPayslipsFiltered.forEach(p => {
+          if (!payRunMap.has(p.payRunId)) {
+            payRunMap.set(p.payRunId, {
+              payRunId: p.payRunId,
+              payRunName: p.payRun?.name || `Cycle ${p.payRunId}`,
+              period: p.payRun?.period || '',
+              payslips: []
+            });
           }
+          payRunMap.get(p.payRunId).payslips.push(p);
         });
+
         // Convert map to array of payRuns with payslips
         const payRuns = Array.from(payRunMap.values());
         setUnpaidPayslips(payRuns);
@@ -175,47 +199,7 @@ const Payments = () => {
     loadUnpaidPayslips();
   }, [effectiveCompanyId]);
 
-  // Load unpaid payslips for record modal dropdown
-  useEffect(() => {
-    if (employeePayslips.length === 0) {
-      setUnpaidPayslips([]);
-      return;
-    }
-    const loadUnpaidPayslips = async () => {
-      try {
-        const payslipsWithPaymentInfo = await Promise.all(
-          employeePayslips.map(async (payslip) => {
-            try {
-              const paymentsRes = await getPaymentsByPayslip(payslip.id);
-              const totalPaid = paymentsRes.data.reduce((sum, payment) => sum + Number(payment.amount || 0), 0);
-              return {
-                ...payslip,
-                totalPaid,
-                remainingAmount: payslip.netSalary - totalPaid
-              };
-            } catch (err) {
-              console.error(`Failed to load payments for payslip ${payslip.id}`, err);
-              return {
-                ...payslip,
-                totalPaid: 0,
-                remainingAmount: payslip.netSalary
-              };
-            }
-          })
-        );
 
-        const unpaid = payslipsWithPaymentInfo.filter(p =>
-          p.remainingAmount > 0.01 || p.paymentStatus === 'PARTIAL'
-        );
-
-        setUnpaidPayslips(unpaid);
-      } catch (err) {
-        console.error('Failed to load unpaid payslips', err);
-        setUnpaidPayslips([]);
-      }
-    };
-    loadUnpaidPayslips();
-  }, [employeePayslips]);
 
   const loadCompanies = async () => {
     try {
@@ -287,13 +271,23 @@ const Payments = () => {
     if (!recordForm.paymentMethod) errs.paymentMethod = 'Méthode de paiement requise';
     setRecordErrors(errs);
     if (Object.keys(errs).length) return;
+
+    const selectedPayRun = unpaidPayslips.find(pr => pr.payRunId === Number(recordForm.payRunId));
+    if (!selectedPayRun) {
+      setRecordErrors({ general: 'Cycle de paie non trouvé' });
+      return;
+    }
+
+    const totalRemaining = selectedPayRun.payslips.reduce((sum, p) => sum + (p.remainingAmount || 0), 0);
+    const enteredAmount = Number(recordForm.amount);
+
+    if (enteredAmount < totalRemaining) {
+      setRecordErrors({ general: `Montant insuffisant. Total requis: ${formatMoney(totalRemaining)}` });
+      return;
+    }
+
     try {
       setRecordSubmitting(true);
-      const selectedPayRun = unpaidPayslips.find(pr => pr.payRunId === Number(recordForm.payRunId));
-      if (!selectedPayRun) {
-        setRecordErrors({ general: 'Cycle de paie non trouvé' });
-        return;
-      }
       // Create payments for each payslip in the selected payRun
       const paymentPromises = selectedPayRun.payslips.map(payslip =>
         createPayment({
@@ -305,8 +299,17 @@ const Payments = () => {
         })
       );
       await Promise.all(paymentPromises);
+
+      // Show success message with remaining if any
+      const remainingAmount = enteredAmount - totalRemaining;
+      const successMessage = remainingAmount > 0
+        ? `Paiement enregistré avec succès. Argent restant: ${formatMoney(remainingAmount)}`
+        : 'Paiement enregistré avec succès';
+
+      setError(''); // Clear any previous error
       setShowRecord(false);
       await loadPayments();
+      // Optionally show success message, but since we don't have a toast, just clear error
     } catch (err) {
       const msg = mapHttpError(err, 'Échec de l\'enregistrement du paiement');
       if (err?.response?.status === 400) setRecordErrors((e) => ({ ...e, general: msg }));
@@ -405,7 +408,12 @@ const Payments = () => {
       const res = await downloadPaymentReceipt(paymentId);
       saveBlob(new Blob([res.data], { type: 'application/pdf' }), `recu-paiement-${paymentId}.pdf`);
     } catch (err) {
-      setError(mapHttpError(err, 'Failed to download receipt'));
+      const msg = mapHttpError(err, 'Failed to download receipt');
+      if (msg.includes('en cours d\'implémentation')) {
+        setError('PDF receipt generation is not yet implemented');
+      } else {
+        setError(msg);
+      }
     } finally {
       setRowLoading((s) => ({ ...s, [paymentId]: false }));
     }
@@ -424,7 +432,12 @@ const Payments = () => {
       const res = await downloadCompanyPaymentsList(effectiveCompanyId, { startDate, endDate });
       saveBlob(new Blob([res.data], { type: 'application/pdf' }), `liste-paiements-${effectiveCompanyId}.pdf`);
     } catch (err) {
-      setError(mapHttpError(err, 'Failed to export payments list'));
+      const msg = mapHttpError(err, 'Failed to export payments list');
+      if (msg.includes('en cours d\'implémentation')) {
+        setError('PDF payments list export is not yet implemented');
+      } else {
+        setError(msg);
+      }
     }
   };
 
@@ -442,7 +455,12 @@ const Payments = () => {
       const res = await downloadPayrollRegister(effectiveCompanyId, Number(registerPayRunId));
       saveBlob(new Blob([res.data], { type: 'application/pdf' }), `registre-paie-${registerPayRunId}.pdf`);
     } catch (err) {
-      setError(mapHttpError(err, 'Failed to export payroll register'));
+      const msg = mapHttpError(err, 'Failed to export payroll register');
+      if (msg.includes('en cours d\'implémentation')) {
+        setError('PDF payroll register export is not yet implemented');
+      } else {
+        setError(msg);
+      }
     }
   };
 
@@ -549,26 +567,28 @@ const Payments = () => {
             <FileText className="h-8 w-8 text-blue-600" />
           </div>
         </div>
-        <div className="bg-white p-6 rounded-lg shadow">
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="text-sm text-gray-600">Export Payroll Register</p>
-              <div className="flex items-center gap-2 mt-2">
-                <input
-                  type="number"
-                  placeholder="Pay Run ID"
-                  value={registerPayRunId}
-                  onChange={(e) => setRegisterPayRunId(e.target.value)}
-                  className="border border-gray-300 rounded-lg px-3 py-1 w-32"
-                />
-                <button onClick={downloadRegister} className="border border-gray-300 px-3 py-1 rounded-lg hover:bg-gray-50 flex items-center">
-                  <Download className="h-4 w-4 mr-1" /> Register
-                </button>
+        {currentUser?.role === 'ADMIN' && (
+          <div className="bg-white p-6 rounded-lg shadow">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm text-gray-600">Export Payroll Register</p>
+                <div className="flex items-center gap-2 mt-2">
+                  <input
+                    type="number"
+                    placeholder="Pay Run ID"
+                    value={registerPayRunId}
+                    onChange={(e) => setRegisterPayRunId(e.target.value)}
+                    className="border border-gray-300 rounded-lg px-3 py-1 w-32"
+                  />
+                  <button onClick={downloadRegister} className="border border-gray-300 px-3 py-1 rounded-lg hover:bg-gray-50 flex items-center">
+                    <Download className="h-4 w-4 mr-1" /> Register
+                  </button>
+                </div>
               </div>
+              <Calendar className="h-8 w-8 text-purple-600" />
             </div>
-            <Calendar className="h-8 w-8 text-purple-600" />
           </div>
-        </div>
+        )}
       </div>
 
       {/* Payments Table */}
@@ -679,26 +699,28 @@ const Payments = () => {
                 <select
                   value={recordForm.payRunId}
                   onChange={(e) => {
-                    const selectedPayRun = unpaidPayslips.find(pr => pr.payRunId === parseInt(e.target.value));
                     setRecordForm((f) => ({
                       ...f,
                       payRunId: e.target.value,
-                      amount: selectedPayRun ? selectedPayRun.payslips.reduce((sum, p) => sum + (p.remainingAmount || 0), 0).toFixed(2) : ''
+                      amount: ''
                     }));
                   }}
                   className={`w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 ${recordErrors.payRunId ? 'border-red-500' : ''}`}
                 >
                   <option value="">Sélectionnez un cycle de paie</option>
-                  {unpaidPayslips.map((pr) => (
-                    <option key={pr.payRunId} value={pr.payRunId}>
-                      {pr.payRunName} - {pr.period} - {pr.payslips.length} bulletins impayés
-                    </option>
-                  ))}
+                  {unpaidPayslips.map((pr) => {
+                    const totalRemaining = pr.payslips.reduce((sum, p) => sum + (p.remainingAmount || 0), 0);
+                    return (
+                      <option key={pr.payRunId} value={pr.payRunId}>
+                        {pr.payRunName} - {pr.period} - {pr.payslips.length} employés - Total restant: {formatMoney(totalRemaining)}
+                      </option>
+                    );
+                  })}
                 </select>
                 {recordErrors.payRunId && <p className="text-red-500 text-sm mt-1">{recordErrors.payRunId}</p>}
               </div>
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Montant *</label>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Montant disponible *</label>
                 <div className="relative">
                   <DollarSign className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-4 w-4" />
                   <input
@@ -706,14 +728,50 @@ const Payments = () => {
                     value={recordForm.amount}
                     onChange={(e) => setRecordForm((f) => ({ ...f, amount: e.target.value }))}
                     className={`w-full pl-10 pr-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 ${recordErrors.amount ? 'border-red-500' : 'border-gray-300'}`}
-                    placeholder="Montant du paiement"
+                    placeholder="Entrez le montant disponible pour ce cycle"
                   />
                 </div>
-                {recordForm.payRunId && (
-                  <p className="text-xs text-gray-500 mt-1">Montant auto-rempli avec le restant total du cycle, modifiable pour paiement partiel</p>
-                )}
+                {recordForm.payRunId && (() => {
+                  const selectedPayRun = unpaidPayslips.find(pr => pr.payRunId === Number(recordForm.payRunId));
+                  const totalRemaining = selectedPayRun ? selectedPayRun.payslips.reduce((sum, p) => sum + (p.remainingAmount || 0), 0) : 0;
+                  return (
+                    <div className="text-xs text-gray-500 mt-1">
+                      <p>Total à payer pour ce cycle: {formatMoney(totalRemaining)}</p>
+                      {recordForm.amount && Number(recordForm.amount) < totalRemaining && (
+                        <p className="text-red-600">Montant insuffisant</p>
+                      )}
+                      {recordForm.amount && Number(recordForm.amount) > totalRemaining && (
+                        <p className="text-green-600">Argent restant après paiement: {formatMoney(Number(recordForm.amount) - totalRemaining)}</p>
+                      )}
+                    </div>
+                  );
+                })()}
                 {recordErrors.amount && <p className="text-red-500 text-sm mt-1">{recordErrors.amount}</p>}
               </div>
+
+              {/* Preview of payments per employee */}
+              {recordForm.payRunId && (() => {
+                const selectedPayRun = unpaidPayslips.find(pr => pr.payRunId === Number(recordForm.payRunId));
+                if (!selectedPayRun) return null;
+                return (
+                  <div className="border border-gray-200 rounded-lg p-3 bg-gray-50">
+                    <h4 className="text-sm font-medium text-gray-700 mb-2">Aperçu des paiements</h4>
+                    <div className="space-y-1 max-h-32 overflow-y-auto">
+                      {selectedPayRun.payslips.map((payslip) => (
+                        <div key={payslip.id} className="flex justify-between text-xs">
+                          <span>{payslip.employee?.fullName || 'Employé'}</span>
+                          <span>{formatMoney(payslip.remainingAmount || 0)}</span>
+                        </div>
+                      ))}
+                    </div>
+                    <div className="border-t border-gray-300 mt-2 pt-2 flex justify-between text-sm font-medium">
+                      <span>Total à payer:</span>
+                      <span>{formatMoney(selectedPayRun.payslips.reduce((sum, p) => sum + (p.remainingAmount || 0), 0))}</span>
+                    </div>
+                  </div>
+                );
+              })()}
+
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">Méthode de paiement *</label>
                 <select
