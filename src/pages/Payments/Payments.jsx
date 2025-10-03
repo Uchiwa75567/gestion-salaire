@@ -14,8 +14,6 @@ import {
   Edit,
 } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
-import api from '../../services/api'; // Added import for api
-
 import {
   getCompanies,
   getPaymentsByCompany,
@@ -28,6 +26,7 @@ import {
   downloadCompanyPaymentsList,
   downloadPayrollRegister,
   getPayslipsByCompany,
+  getEmployees,
 } from '../../services/api';
 
 const METHODS = ['CASH', 'BANK_TRANSFER', 'ORANGE_MONEY', 'WAVE', 'OTHER'];
@@ -63,7 +62,7 @@ const Payments = () => {
   const [showRecord, setShowRecord] = useState(false);
   const [recordSubmitting, setRecordSubmitting] = useState(false);
   const [recordForm, setRecordForm] = useState({
-    payslipId: '',
+    payRunId: '',
     amount: '',
     paymentMethod: 'CASH',
     reference: '',
@@ -117,7 +116,7 @@ const Payments = () => {
       if (currentUser?.role === 'CAISSIER') {
         // For cashier, load employees directly from API
         try {
-          const res = await api.get('/employees');
+          const res = await getEmployees();
           setEmployees(res.data || []);
         } catch (err) {
           console.error('Failed to load employees', err);
@@ -276,27 +275,36 @@ const Payments = () => {
   // Record Payment
   const openRecord = () => {
     setRecordErrors({});
-    setRecordForm({ payslipId: '', amount: '', paymentMethod: 'CASH', reference: '', notes: '' });
+    setRecordForm({ payRunId: '', amount: '', paymentMethod: 'CASH', reference: '', notes: '' });
     setShowRecord(true);
   };
 
   const submitRecord = async (e) => {
     e.preventDefault();
     const errs = {};
-    if (!recordForm.payslipId) errs.payslipId = 'Bulletin requis';
+    if (!recordForm.payRunId) errs.payRunId = 'Cycle de paie requis';
     if (!recordForm.amount || Number(recordForm.amount) <= 0) errs.amount = 'Montant valide requis';
     if (!recordForm.paymentMethod) errs.paymentMethod = 'Méthode de paiement requise';
     setRecordErrors(errs);
     if (Object.keys(errs).length) return;
     try {
       setRecordSubmitting(true);
-      await createPayment({
-        payslipId: Number(recordForm.payslipId),
-        amount: Number(recordForm.amount),
-        paymentMethod: recordForm.paymentMethod,
-        reference: recordForm.reference || undefined,
-        notes: recordForm.notes || undefined,
-      });
+      const selectedPayRun = unpaidPayslips.find(pr => pr.payRunId === Number(recordForm.payRunId));
+      if (!selectedPayRun) {
+        setRecordErrors({ general: 'Cycle de paie non trouvé' });
+        return;
+      }
+      // Create payments for each payslip in the selected payRun
+      const paymentPromises = selectedPayRun.payslips.map(payslip =>
+        createPayment({
+          payslipId: payslip.id,
+          amount: payslip.remainingAmount || 0,
+          paymentMethod: recordForm.paymentMethod,
+          reference: recordForm.reference || undefined,
+          notes: recordForm.notes || undefined,
+        })
+      );
+      await Promise.all(paymentPromises);
       setShowRecord(false);
       await loadPayments();
     } catch (err) {
@@ -667,18 +675,18 @@ const Payments = () => {
             </div>
             <form onSubmit={submitRecord} className="space-y-4">
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Bulletin de salaire *</label>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Cycle de paie *</label>
                 <select
-                  value={recordForm.payslipId}
+                  value={recordForm.payRunId}
                   onChange={(e) => {
                     const selectedPayRun = unpaidPayslips.find(pr => pr.payRunId === parseInt(e.target.value));
                     setRecordForm((f) => ({
                       ...f,
-                      payslipId: e.target.value,
+                      payRunId: e.target.value,
                       amount: selectedPayRun ? selectedPayRun.payslips.reduce((sum, p) => sum + (p.remainingAmount || 0), 0).toFixed(2) : ''
                     }));
                   }}
-                  className={`w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 ${recordErrors.payslipId ? 'border-red-500' : ''}`}
+                  className={`w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 ${recordErrors.payRunId ? 'border-red-500' : ''}`}
                 >
                   <option value="">Sélectionnez un cycle de paie</option>
                   {unpaidPayslips.map((pr) => (
@@ -687,7 +695,7 @@ const Payments = () => {
                     </option>
                   ))}
                 </select>
-                {recordErrors.payslipId && <p className="text-red-500 text-sm mt-1">{recordErrors.payslipId}</p>}
+                {recordErrors.payRunId && <p className="text-red-500 text-sm mt-1">{recordErrors.payRunId}</p>}
               </div>
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">Montant *</label>
@@ -701,8 +709,8 @@ const Payments = () => {
                     placeholder="Montant du paiement"
                   />
                 </div>
-                {recordForm.payslipId && (
-                  <p className="text-xs text-gray-500 mt-1">Montant auto-rempli avec le restant, modifiable pour paiement partiel</p>
+                {recordForm.payRunId && (
+                  <p className="text-xs text-gray-500 mt-1">Montant auto-rempli avec le restant total du cycle, modifiable pour paiement partiel</p>
                 )}
                 {recordErrors.amount && <p className="text-red-500 text-sm mt-1">{recordErrors.amount}</p>}
               </div>
