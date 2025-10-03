@@ -46,7 +46,7 @@ const Payslips = () => {
   // Row loading
   const [rowLoading, setRowLoading] = useState({});
 
-  const canAccess = currentUser?.role === 'SUPERADMIN' || currentUser?.role === 'ADMIN';
+  const canAccess = currentUser?.role === 'SUPERADMIN' || currentUser?.role === 'ADMIN' || currentUser?.role === 'CAISSIER';
   const canEdit = useMemo(() => {
     if (!selectedPayslip) return false;
     const prStatus = selectedPayslip?.payRun?.status;
@@ -224,10 +224,9 @@ const Payslips = () => {
     } catch (err) {
       // Fallback: if backend route order causes 400/"ID invalide" or no payslips found, export individual PDFs
       const status = err?.response?.status;
-      const apiMsg = err?.response?.data?.error || '';
-      const looksLikeRouteConflict = status === 400 && (apiMsg.toLowerCase().includes('id invalide') || apiMsg.toLowerCase().includes('aucun bulletin'));
-
-      if (!looksLikeRouteConflict) {
+      const apiMsg = err?.response?.data?.error || err?.response?.data?.message;
+      const looksLikeNoPayslips = status === 400;
+      if (!looksLikeNoPayslips) {
         setError(mapHttpError(err, 'Failed to download pay run payslips PDF'));
         return;
       }

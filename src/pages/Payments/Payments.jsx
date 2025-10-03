@@ -14,6 +14,8 @@ import {
   Edit,
 } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
+import api from '../../services/api'; // Added import for api
+
 import {
   getCompanies,
   getPaymentsByCompany,
@@ -43,6 +45,12 @@ const Payments = () => {
   // Payslips for dropdown
   const [payslips, setPayslips] = useState([]);
 
+  // Employees extracted from payslips
+  const [employees, setEmployees] = useState([]);
+
+  // Unpaid payslips for selected employee
+  const [unpaidPayslips, setUnpaidPayslips] = useState([]);
+
   // Data
   const [payments, setPayments] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -62,6 +70,7 @@ const Payments = () => {
     notes: '',
   });
   const [recordErrors, setRecordErrors] = useState({});
+  const [employeePayslips, setEmployeePayslips] = useState([]);
 
   // Edit Payment Modal
   const [showEdit, setShowEdit] = useState(false);
@@ -92,6 +101,7 @@ const Payments = () => {
   useEffect(() => {
     if (!effectiveCompanyId) {
       setPayslips([]);
+      setEmployees([]);
       return;
     }
     const loadPayslips = async () => {
@@ -103,13 +113,110 @@ const Payments = () => {
         setPayslips([]);
       }
     };
-    loadPayslips();
-  }, [effectiveCompanyId]);
+    const loadEmployees = async () => {
+      if (currentUser?.role === 'CAISSIER') {
+        // For cashier, load employees directly from API
+        try {
+          const res = await api.get('/employees');
+          setEmployees(res.data || []);
+        } catch (err) {
+          console.error('Failed to load employees', err);
+          setEmployees([]);
+        }
+      } else {
+        // Extract unique employees from payslips
+        const uniqueEmployees = [...new Map(payslips.map(p => [p.employee.id, p.employee])).values()];
+        setEmployees(uniqueEmployees);
+      }
+    };
+    loadPayslips().then(loadEmployees);
+  }, [effectiveCompanyId, currentUser?.role]);
+
 
   useEffect(() => {
     loadPayments();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [effectiveCompanyId, startDate, endDate]);
+
+  // Load unpaid payslips when employee is selected
+  // Removed because payment is now for all active employees of the company
+  useEffect(() => {
+    if (!effectiveCompanyId) {
+      setUnpaidPayslips([]);
+      return;
+    }
+    const loadUnpaidPayslips = async () => {
+      try {
+        const res = await getPayslipsByCompany(effectiveCompanyId);
+        const allPayslips = res.data || [];
+        // Filter only unpaid or partial payslips (payRun level) for active employees
+        // Group payslips by payRunId to get unique payRuns
+        const payRunMap = new Map();
+        allPayslips.forEach(p => {
+          if (p.paymentStatus !== 'PAID' && p.employee?.isActive) {
+            if (!payRunMap.has(p.payRunId)) {
+              payRunMap.set(p.payRunId, {
+                payRunId: p.payRunId,
+                payRunName: p.payRun?.name || `Cycle ${p.payRunId}`,
+                period: p.payRun?.period || '',
+                payslips: []
+              });
+            }
+            payRunMap.get(p.payRunId).payslips.push(p);
+          }
+        });
+        // Convert map to array of payRuns with payslips
+        const payRuns = Array.from(payRunMap.values());
+        setUnpaidPayslips(payRuns);
+      } catch (err) {
+        console.error('Failed to load unpaid payslips grouped by payRun', err);
+        setUnpaidPayslips([]);
+      }
+    };
+    loadUnpaidPayslips();
+  }, [effectiveCompanyId]);
+
+  // Load unpaid payslips for record modal dropdown
+  useEffect(() => {
+    if (employeePayslips.length === 0) {
+      setUnpaidPayslips([]);
+      return;
+    }
+    const loadUnpaidPayslips = async () => {
+      try {
+        const payslipsWithPaymentInfo = await Promise.all(
+          employeePayslips.map(async (payslip) => {
+            try {
+              const paymentsRes = await getPaymentsByPayslip(payslip.id);
+              const totalPaid = paymentsRes.data.reduce((sum, payment) => sum + Number(payment.amount || 0), 0);
+              return {
+                ...payslip,
+                totalPaid,
+                remainingAmount: payslip.netSalary - totalPaid
+              };
+            } catch (err) {
+              console.error(`Failed to load payments for payslip ${payslip.id}`, err);
+              return {
+                ...payslip,
+                totalPaid: 0,
+                remainingAmount: payslip.netSalary
+              };
+            }
+          })
+        );
+
+        const unpaid = payslipsWithPaymentInfo.filter(p =>
+          p.remainingAmount > 0.01 || p.paymentStatus === 'PARTIAL'
+        );
+
+        setUnpaidPayslips(unpaid);
+      } catch (err) {
+        console.error('Failed to load unpaid payslips', err);
+        setUnpaidPayslips([]);
+      }
+    };
+    loadUnpaidPayslips();
+  }, [employeePayslips]);
 
   const loadCompanies = async () => {
     try {
@@ -176,9 +283,9 @@ const Payments = () => {
   const submitRecord = async (e) => {
     e.preventDefault();
     const errs = {};
-    if (!recordForm.payslipId) errs.payslipId = 'Payslip ID is required';
-    if (!recordForm.amount || Number(recordForm.amount) <= 0) errs.amount = 'Valid amount is required';
-    if (!recordForm.paymentMethod) errs.paymentMethod = 'Payment method is required';
+    if (!recordForm.payslipId) errs.payslipId = 'Bulletin requis';
+    if (!recordForm.amount || Number(recordForm.amount) <= 0) errs.amount = 'Montant valide requis';
+    if (!recordForm.paymentMethod) errs.paymentMethod = 'Méthode de paiement requise';
     setRecordErrors(errs);
     if (Object.keys(errs).length) return;
     try {
@@ -193,7 +300,7 @@ const Payments = () => {
       setShowRecord(false);
       await loadPayments();
     } catch (err) {
-      const msg = mapHttpError(err, 'Failed to record payment');
+      const msg = mapHttpError(err, 'Échec de l\'enregistrement du paiement');
       if (err?.response?.status === 400) setRecordErrors((e) => ({ ...e, general: msg }));
       else setError(msg);
     } finally {
@@ -387,7 +494,7 @@ const Payments = () => {
             >
               <option value="">Select Company</option>
               {companies.map((c) => (
-                <option key={c.id} value={c.id}>
+                <option key={c.id} value={c.name || c.address}>
                   {c.name || c.address}
                 </option>
               ))}
@@ -553,25 +660,37 @@ const Payments = () => {
         <div className="fixed inset-0 backdrop-blur-xl bg-black/20 flex items-center justify-center p-4 z-50">
           <div className="bg-white rounded-lg p-6 w-full max-w-md">
             <div className="flex justify-between items-center mb-4">
-              <h3 className="text-lg font-semibold">Record Payment</h3>
+              <h3 className="text-lg font-semibold">Enregistrer un paiement</h3>
               <button onClick={() => setShowRecord(false)} className="p-1 text-gray-400 hover:text-gray-600">
                 <X className="h-5 w-5" />
               </button>
             </div>
             <form onSubmit={submitRecord} className="space-y-4">
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Payslip ID *</label>
-                <input
-                  type="number"
+                <label className="block text-sm font-medium text-gray-700 mb-1">Bulletin de salaire *</label>
+                <select
                   value={recordForm.payslipId}
-                  onChange={(e) => setRecordForm((f) => ({ ...f, payslipId: e.target.value }))}
-                  className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 ${recordErrors.payslipId ? 'border-red-500' : 'border-gray-300'}`}
-                  placeholder="Enter payslip ID"
-                />
+                  onChange={(e) => {
+                    const selectedPayRun = unpaidPayslips.find(pr => pr.payRunId === parseInt(e.target.value));
+                    setRecordForm((f) => ({
+                      ...f,
+                      payslipId: e.target.value,
+                      amount: selectedPayRun ? selectedPayRun.payslips.reduce((sum, p) => sum + (p.remainingAmount || 0), 0).toFixed(2) : ''
+                    }));
+                  }}
+                  className={`w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 ${recordErrors.payslipId ? 'border-red-500' : ''}`}
+                >
+                  <option value="">Sélectionnez un cycle de paie</option>
+                  {unpaidPayslips.map((pr) => (
+                    <option key={pr.payRunId} value={pr.payRunId}>
+                      {pr.payRunName} - {pr.period} - {pr.payslips.length} bulletins impayés
+                    </option>
+                  ))}
+                </select>
                 {recordErrors.payslipId && <p className="text-red-500 text-sm mt-1">{recordErrors.payslipId}</p>}
               </div>
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Amount *</label>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Montant *</label>
                 <div className="relative">
                   <DollarSign className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-4 w-4" />
                   <input
@@ -579,17 +698,20 @@ const Payments = () => {
                     value={recordForm.amount}
                     onChange={(e) => setRecordForm((f) => ({ ...f, amount: e.target.value }))}
                     className={`w-full pl-10 pr-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 ${recordErrors.amount ? 'border-red-500' : 'border-gray-300'}`}
-                    placeholder="0.00"
+                    placeholder="Montant du paiement"
                   />
                 </div>
+                {recordForm.payslipId && (
+                  <p className="text-xs text-gray-500 mt-1">Montant auto-rempli avec le restant, modifiable pour paiement partiel</p>
+                )}
                 {recordErrors.amount && <p className="text-red-500 text-sm mt-1">{recordErrors.amount}</p>}
               </div>
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Payment Method *</label>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Méthode de paiement *</label>
                 <select
                   value={recordForm.paymentMethod}
                   onChange={(e) => setRecordForm((f) => ({ ...f, paymentMethod: e.target.value }))}
-                  className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 ${recordErrors.paymentMethod ? 'border-red-500' : 'border-gray-300'}`}
+                  className={`w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 ${recordErrors.paymentMethod ? 'border-red-500' : ''}`}
                 >
                   {METHODS.map((m) => (
                     <option key={m} value={m}>{m.replace('_', ' ')}</option>
@@ -631,10 +753,10 @@ const Payments = () => {
                 >
                   {recordSubmitting ? (
                     <>
-                      <Loader2 className="h-4 w-4 mr-2 animate-spin" /> Recording...
+                      <Loader2 className="h-4 w-4 mr-2 animate-spin" /> Enregistrement...
                     </>
                   ) : (
-                    'Record Payment'
+                    'Enregistrer le paiement'
                   )}
                 </button>
               </div>
@@ -673,7 +795,7 @@ const Payments = () => {
                 <select
                   value={editForm.paymentMethod}
                   onChange={(e) => setEditForm((f) => ({ ...f, paymentMethod: e.target.value }))}
-                  className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 ${editErrors.paymentMethod ? 'border-red-500' : 'border-gray-300'}`}
+                  className={`w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 ${editErrors.paymentMethod ? 'border-red-500' : ''}`}
                 >
                   {METHODS.map((m) => (
                     <option key={m} value={m}>{m.replace('_', ' ')}</option>
@@ -794,6 +916,15 @@ const mapHttpError = (err, fallback) => {
 const formatMoney = (n) => {
   const x = Number(n || 0);
   return x.toLocaleString(undefined, { style: 'currency', currency: 'USD', maximumFractionDigits: 2 });
+};
+
+const safeDate = (dateStr) => {
+  if (!dateStr) return '';
+  try {
+    return new Date(dateStr).toLocaleDateString();
+  } catch {
+    return '';
+  }
 };
 
 export default Payments;
